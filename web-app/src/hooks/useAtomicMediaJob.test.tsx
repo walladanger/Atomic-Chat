@@ -1,0 +1,142 @@
+import { act, renderHook } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { useAtomicMediaJob } from './useAtomicMediaJob'
+import type {
+  AtomicMediaHealth,
+  AtomicMediaJobRequest,
+  AtomicMediaJobSnapshot,
+} from '@/services/atomicMedia/types'
+
+type FakeClient = {
+  health: ReturnType<typeof vi.fn<() => Promise<AtomicMediaHealth>>>
+  createJob: ReturnType<
+    typeof vi.fn<(request: AtomicMediaJobRequest) => Promise<AtomicMediaJobSnapshot>>
+  >
+  getJob: ReturnType<
+    typeof vi.fn<(jobId: string) => Promise<AtomicMediaJobSnapshot>>
+  >
+}
+
+const request: AtomicMediaJobRequest = {
+  kind: 'text_to_video',
+  prompt: 'test',
+  device: 'auto',
+  preset: 'wan2.2-ti2v-5b',
+  width: 832,
+  height: 480,
+  num_frames: 17,
+  steps: 10,
+  fps: 12,
+  guidance_scale: 5,
+}
+
+function makeClient(): FakeClient {
+  return {
+    health: vi.fn().mockResolvedValue({
+      service: 'atomic-media-worker',
+      version: '0.6.1',
+      status: 'ok',
+    }),
+    createJob: vi.fn().mockResolvedValue({
+      job_id: 'job-1',
+      status: 'queued',
+      kind: 'text_to_video',
+    }),
+    getJob: vi.fn(),
+  }
+}
+
+describe('useAtomicMediaJob', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('reports an offline worker without throwing from the hook', async () => {
+    const client = makeClient()
+    client.health.mockRejectedValue(new Error('offline'))
+
+    const { result } = renderHook(() => useAtomicMediaJob(client))
+
+    await act(async () => {
+      await result.current.refreshHealth()
+    })
+
+    expect(result.current.workerState).toBe('offline')
+    expect(result.current.workerHealth).toBeNull()
+  })
+
+  it('submits a job and polls queued to running to succeeded', async () => {
+    const client = makeClient()
+    client.getJob
+      .mockResolvedValueOnce({ job_id: 'job-1', status: 'running' })
+      .mockResolvedValueOnce({
+        job_id: 'job-1',
+        status: 'succeeded',
+        output_path: 'D:/outputs/job-1.mp4',
+      })
+
+    const { result } = renderHook(() => useAtomicMediaJob(client, 100))
+
+    await act(async () => {
+      await result.current.submit(request)
+    })
+    expect(result.current.job?.status).toBe('queued')
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100)
+    })
+    expect(result.current.job?.status).toBe('running')
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100)
+    })
+    expect(result.current.job?.status).toBe('succeeded')
+    expect(client.getJob).toHaveBeenCalledTimes(2)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500)
+    })
+    expect(client.getJob).toHaveBeenCalledTimes(2)
+  })
+
+  it('stops polling after a failed terminal job', async () => {
+    const client = makeClient()
+    client.getJob.mockResolvedValue({
+      job_id: 'job-1',
+      status: 'failed',
+      error: 'generation failed',
+    })
+
+    const { result } = renderHook(() => useAtomicMediaJob(client, 100))
+    await act(async () => {
+      await result.current.submit(request)
+      await vi.advanceTimersByTimeAsync(100)
+    })
+
+    expect(result.current.job?.status).toBe('failed')
+    expect(result.current.error).toBe('generation failed')
+  })
+
+  it('cancels pending polling on unmount', async () => {
+    const client = makeClient()
+    client.getJob.mockResolvedValue({ job_id: 'job-1', status: 'running' })
+
+    const { result, unmount } = renderHook(() =>
+      useAtomicMediaJob(client, 100)
+    )
+    await act(async () => {
+      await result.current.submit(request)
+    })
+
+    unmount()
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500)
+    })
+
+    expect(client.getJob).not.toHaveBeenCalled()
+  })
+})
