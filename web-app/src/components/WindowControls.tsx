@@ -53,21 +53,14 @@ export const WindowControls = () => {
   }
 
   return (
-    <div
-      className={cn(
-        'absolute top-0 z-50 h-15',
-        isMaximized ? 'right-0' : 'right-4'
-      )}
-    >
-      <div
-        className={cn('flex h-full', isMaximized ? 'items-stretch' : 'items-center')}
-      >
+    <div className="absolute right-0 top-0 z-50 h-10">
+      <div className="flex h-full items-stretch">
         <Button
           onClick={handleMinimize}
           aria-label="Minimize"
           variant="ghost"
           size="icon-sm"
-          className={cn(isMaximized && 'h-full')}
+          className="h-full w-11 rounded-none"
         >
           <Minus className="size-4" />
         </Button>
@@ -76,18 +69,16 @@ export const WindowControls = () => {
           variant="ghost"
           size="icon-sm"
           aria-label="Maximize"
-          className={cn(isMaximized && 'h-full')}
+          className="h-full w-11 rounded-none"
         >
-          <Square className="size-3" />
+          <Square className={cn('size-3', isMaximized && 'scale-90')} />
         </Button>
         <Button
           onClick={handleClose}
           variant="ghost"
           size="icon-sm"
           aria-label="Close"
-          className={cn(
-            isMaximized && 'h-full rounded-none hover:rounded-none'
-          )}
+          className="h-full w-11 rounded-none hover:bg-red-500 hover:text-white"
         >
           <X className="size-4" />
         </Button>
