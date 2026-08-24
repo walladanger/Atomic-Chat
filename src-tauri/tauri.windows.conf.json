@@ -15,7 +15,7 @@
         "visible": false,
         "hiddenTitle": true,
         "transparent": false,
-        "decorations": true,
+        "decorations": false,
         "titleBarStyle": "Overlay",
         "windowEffects": {
           "effects": ["fullScreenUI", "mica", "tabbed", "blur", "acrylic"],
