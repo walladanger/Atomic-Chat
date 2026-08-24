@@ -4,16 +4,21 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { route } from '@/constants/routes'
+import { useLocation, useNavigate } from '@tanstack/react-router'
 
 type ChatAgentModeSwitchProps = {
   isAgentMode: boolean
   onChange: (isAgentMode: boolean) => void
   chatLabel: string
   agentLabel: string
+  mediaLabel?: string
   agentDisabled?: boolean
   agentDisabledTooltip?: string
   showAgentAttention?: boolean
 }
+
+type WorkspaceMode = 'chat' | 'agent' | 'media'
 
 export function canSelectChatAgentMode(
   initialMessage: boolean | undefined,
@@ -27,22 +32,41 @@ export function ChatAgentModeSwitch({
   onChange,
   chatLabel,
   agentLabel,
+  mediaLabel = 'Media',
   agentDisabled = false,
   agentDisabledTooltip,
   showAgentAttention = false,
 }: ChatAgentModeSwitchProps) {
+  const navigate = useNavigate()
+  const { pathname } = useLocation()
+  const activeMode: WorkspaceMode = pathname === route.media
+    ? 'media'
+    : isAgentMode
+      ? 'agent'
+      : 'chat'
+
+  const selectMode = (mode: WorkspaceMode) => {
+    if (mode === 'media') {
+      navigate({ to: route.media })
+      return
+    }
+    onChange(mode === 'agent')
+  }
+
   return (
     <div
       className="flex w-full items-center rounded-lg border border-border/60 bg-muted/80 p-0.5"
       role="group"
-      aria-label={`${chatLabel} / ${agentLabel}`}
+      aria-label={`${chatLabel} / ${agentLabel} / ${mediaLabel}`}
     >
       {[
-        { label: chatLabel, value: false },
-        { label: agentLabel, value: true },
+        { label: chatLabel, value: 'chat' as const },
+        { label: agentLabel, value: 'agent' as const },
+        { label: mediaLabel, value: 'media' as const },
       ].map((mode) => {
-        const isActive = isAgentMode === mode.value
-        const isDisabled = mode.value && agentDisabled
+        const isActive = activeMode === mode.value
+        const isAgentChoice = mode.value === 'agent'
+        const isDisabled = isAgentChoice && agentDisabled
 
         const button = (
           <button
@@ -50,7 +74,7 @@ export function ChatAgentModeSwitch({
             type="button"
             aria-pressed={isActive}
             disabled={isDisabled}
-            onClick={() => onChange(mode.value)}
+            onClick={() => selectMode(mode.value)}
             className={cn(
               'relative flex-1 cursor-pointer rounded-md px-3 py-0.5 text-xs font-medium text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               isActive &&
@@ -59,7 +83,7 @@ export function ChatAgentModeSwitch({
             )}
           >
             {mode.label}
-            {mode.value && showAgentAttention && (
+            {isAgentChoice && showAgentAttention && (
               <span
                 data-testid="agent-mode-attention-dot"
                 aria-hidden="true"
