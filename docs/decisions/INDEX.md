@@ -15,6 +15,7 @@ decision is reversed, add a new one that says which record it supersedes.
 
 ## Load-bearing — read before touching platform / provider / agent code
 
+- **2026-09-04** — [Route Atomic Code through configurable model candidates](2026-09-04-route-atomic-code-through-configurable-model-candidates.md)
 - **2026-08-13** — [Mirror and sign upstream llama.cpp releases in atomic-chat-conf](2026-08-13-mirror-and-sign-upstream-llama-cpp-in-atomic-chat-conf.md)
 - **2026-08-13** — [Add Windows ROCm to the upstream backend matrix](2026-08-13-add-windows-rocm-to-the-upstream-backend-matrix.md)
 - **2026-07-28** — [Ship dual llama providers on Windows and Linux](2026-07-28-ship-dual-llama-providers-on-windows-and-linux.md)
@@ -280,4 +281,3 @@ decision is reversed, add a new one that says which record it supersedes.
 - **2026-07-28** — [Isolate the unstable Tauri IPC test API](2026-07-28-isolate-tauri-ipc-test-api.md)
 - **2026-07-23** — [Isolate the Windows Common Controls test manifest by feature](2026-07-23-isolate-the-windows-common-controls-test-manifest-by-feature.md)
 - **2026-07-20** — [Open Agent-referenced files from assistant summaries](2026-07-20-open-agent-referenced-files-from-assistant-summaries.md)
-

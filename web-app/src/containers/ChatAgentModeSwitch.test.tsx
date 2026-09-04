@@ -2,14 +2,6 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ChatAgentModeSwitch } from './ChatAgentModeSwitch'
 
-const navigate = vi.fn()
-let pathname = '/'
-
-vi.mock('@tanstack/react-router', () => ({
-  useLocation: () => ({ pathname }),
-  useNavigate: () => navigate,
-}))
-
 vi.mock('@/components/ui/tooltip', () => ({
   Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   TooltipTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -17,12 +9,9 @@ vi.mock('@/components/ui/tooltip', () => ({
 }))
 
 describe('ChatAgentModeSwitch', () => {
-  beforeEach(() => {
-    navigate.mockReset()
-    pathname = '/'
-  })
+  beforeEach(() => vi.clearAllMocks())
 
-  it('renders Chat, Agent, and Media choices', () => {
+  it('renders Chat, Agent, Media, and Code choices', () => {
     render(
       <ChatAgentModeSwitch
         isAgentMode={false}
@@ -35,6 +24,7 @@ describe('ChatAgentModeSwitch', () => {
     expect(screen.getByRole('button', { name: 'Chat' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Agent' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Media' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Code' })).toBeInTheDocument()
   })
 
   it('keeps Agent disabled independently from Media', () => {
@@ -55,10 +45,12 @@ describe('ChatAgentModeSwitch', () => {
 
   it('navigates to Media without changing Agent mode', () => {
     const onChange = vi.fn()
+    const onWorkspaceChange = vi.fn()
     render(
       <ChatAgentModeSwitch
         isAgentMode={false}
         onChange={onChange}
+        onWorkspaceChange={onWorkspaceChange}
         chatLabel="Chat"
         agentLabel="Agent"
       />
@@ -66,22 +58,70 @@ describe('ChatAgentModeSwitch', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Media' }))
 
-    expect(navigate).toHaveBeenCalledWith({ to: '/media' })
+    expect(onWorkspaceChange).toHaveBeenCalledWith('media')
     expect(onChange).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Agent' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    )
+  })
+
+  it('navigates to Code without changing Agent mode', () => {
+    const onChange = vi.fn()
+    const onWorkspaceChange = vi.fn()
+    render(
+      <ChatAgentModeSwitch
+        isAgentMode={false}
+        onChange={onChange}
+        onWorkspaceChange={onWorkspaceChange}
+        chatLabel="Chat"
+        agentLabel="Agent"
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Code' }))
+
+    expect(onWorkspaceChange).toHaveBeenCalledWith('code')
+    expect(onChange).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Agent' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    )
   })
 
   it('marks Media active when the Media route is open', () => {
-    pathname = '/media'
     render(
       <ChatAgentModeSwitch
         isAgentMode={false}
         onChange={vi.fn()}
+        activeWorkspace="media"
         chatLabel="Chat"
         agentLabel="Agent"
       />
     )
 
     expect(screen.getByRole('button', { name: 'Media' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    expect(screen.getByRole('button', { name: 'Chat' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    )
+  })
+
+  it('marks Code active when the Code route is open', () => {
+    render(
+      <ChatAgentModeSwitch
+        isAgentMode={false}
+        onChange={vi.fn()}
+        activeWorkspace="code"
+        chatLabel="Chat"
+        agentLabel="Agent"
+      />
+    )
+
+    expect(screen.getByRole('button', { name: 'Code' })).toHaveAttribute(
       'aria-pressed',
       'true'
     )

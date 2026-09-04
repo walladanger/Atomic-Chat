@@ -4,6 +4,7 @@ export const localStorageKey = {
   messages: 'messages',
   theme: 'theme',
   modelProvider: 'model-provider',
+  modelStrategy: 'atomic-model-strategy',
   modelSources: 'model-sources',
   settingInterface: 'setting-appearance',
   settingGeneral: 'setting-general',

@@ -16,12 +16,13 @@ type MediaPreviewProps = {
 }
 
 export function MediaPreview({ job }: MediaPreviewProps) {
-  const outputPath = job?.status === 'succeeded' ? job.output_path : null
+  const successfulJob = job?.status === 'succeeded' ? job : null
+  const outputPath = successfulJob?.output_path
 
   return (
     <div className="relative flex min-h-[340px] flex-1 items-center justify-center overflow-hidden rounded-2xl border border-border/60 bg-muted/30 shadow-sm">
       {outputPath ? (
-        isVideoJob(job) ? (
+        isVideoJob(successfulJob) ? (
           <video
             data-testid="media-video-preview"
             className="max-h-[58vh] w-full bg-black object-contain"

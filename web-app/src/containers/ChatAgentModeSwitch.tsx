@@ -4,8 +4,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { route } from '@/constants/routes'
-import { useLocation, useNavigate } from '@tanstack/react-router'
+
+type RoutedWorkspace = 'media' | 'code'
 
 type ChatAgentModeSwitchProps = {
   isAgentMode: boolean
@@ -13,12 +13,15 @@ type ChatAgentModeSwitchProps = {
   chatLabel: string
   agentLabel: string
   mediaLabel?: string
+  codeLabel?: string
+  activeWorkspace?: RoutedWorkspace
+  onWorkspaceChange?: (workspace: RoutedWorkspace) => void
   agentDisabled?: boolean
   agentDisabledTooltip?: string
   showAgentAttention?: boolean
 }
 
-type WorkspaceMode = 'chat' | 'agent' | 'media'
+type WorkspaceMode = 'chat' | 'agent' | 'media' | 'code'
 
 export function canSelectChatAgentMode(
   initialMessage: boolean | undefined,
@@ -33,21 +36,19 @@ export function ChatAgentModeSwitch({
   chatLabel,
   agentLabel,
   mediaLabel = 'Media',
+  codeLabel = 'Code',
+  activeWorkspace,
+  onWorkspaceChange,
   agentDisabled = false,
   agentDisabledTooltip,
   showAgentAttention = false,
 }: ChatAgentModeSwitchProps) {
-  const navigate = useNavigate()
-  const { pathname } = useLocation()
-  const activeMode: WorkspaceMode = pathname === route.media
-    ? 'media'
-    : isAgentMode
-      ? 'agent'
-      : 'chat'
+  const activeMode: WorkspaceMode =
+    activeWorkspace ?? (isAgentMode ? 'agent' : 'chat')
 
   const selectMode = (mode: WorkspaceMode) => {
-    if (mode === 'media') {
-      navigate({ to: route.media })
+    if (mode === 'media' || mode === 'code') {
+      onWorkspaceChange?.(mode)
       return
     }
     onChange(mode === 'agent')
@@ -57,12 +58,13 @@ export function ChatAgentModeSwitch({
     <div
       className="flex w-full items-center rounded-lg border border-border/60 bg-muted/80 p-0.5"
       role="group"
-      aria-label={`${chatLabel} / ${agentLabel} / ${mediaLabel}`}
+      aria-label={`${chatLabel} / ${agentLabel} / ${mediaLabel} / ${codeLabel}`}
     >
       {[
         { label: chatLabel, value: 'chat' as const },
         { label: agentLabel, value: 'agent' as const },
         { label: mediaLabel, value: 'media' as const },
+        { label: codeLabel, value: 'code' as const },
       ].map((mode) => {
         const isActive = activeMode === mode.value
         const isAgentChoice = mode.value === 'agent'

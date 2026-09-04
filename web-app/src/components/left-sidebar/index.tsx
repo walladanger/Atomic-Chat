@@ -187,6 +187,18 @@ export function LeftSidebar() {
             <ChatAgentModeSwitch
               isAgentMode={sidebarMode === 'agent'}
               onChange={(isAgent) => selectMode(isAgent ? 'agent' : 'chat')}
+              activeWorkspace={
+                pathname === route.media
+                  ? 'media'
+                  : pathname === route.code
+                    ? 'code'
+                    : undefined
+              }
+              onWorkspaceChange={(workspace) =>
+                navigate({
+                  to: workspace === 'media' ? route.media : route.code,
+                })
+              }
               chatLabel={t('chat:agentMode.chat')}
               agentLabel={t('chat:agentMode.agent')}
               agentDisabled={!isAgentProviderSelected}
