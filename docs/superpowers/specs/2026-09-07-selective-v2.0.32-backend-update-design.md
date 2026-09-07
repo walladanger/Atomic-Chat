@@ -96,7 +96,7 @@ The Windows x64 distribution carries these current stable runtime packages:
 2. standard llama.cpp `win-cuda12.4-x64` at `b10431`;
 3. the matching standard CUDA 12.4 runtime companion at `b10431`;
 4. TurboQuant `windows-x64-cpu` at `b10269-1.5.1`;
-5. TurboQuant `windows-x64-cuda-12-4` at `b10269-1.5.1`.
+5. TurboQuant `windows-x64-cuda-12.4` at `b10269-1.5.1`.
 
 These five archives represent the four user-visible choices: Standard CPU,
 Standard CUDA 12.4, TurboQuant CPU, and TurboQuant CUDA 12.4. Build resolution
