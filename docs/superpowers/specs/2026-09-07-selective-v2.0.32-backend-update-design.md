@@ -4,8 +4,9 @@
 
 Update the Atomic Chat fork from its `v2.0.23` base toward upstream
 `AtomicBot-ai/Atomic-Chat` tag `v2.0.32` by selecting backend and narrowly
-related configuration changes, while preserving the fork's Code workspace,
-Atomic Media workspace, branding, layout, user data, language support, and
+related configuration changes. Remove the fork's Atomic Code page, bundle the
+approved Windows CPU and CUDA 12.4 backend matrix for offline use, and preserve
+the Atomic Media workspace, branding, layout, user data, language support, and
 unrelated dirty-worktree changes.
 
 ## Repository state and recovery
@@ -43,17 +44,10 @@ of truth unless a named feature requires a compatible extension.
 
 ## Protected surfaces
 
-The following files are immutable for this update and will be checked by
-SHA-256 before the final commit:
+The user's later instruction to remove Atomic Code supersedes the original
+Code-page immutability requirement. The following Atomic Media files remain
+immutable and will be checked by SHA-256 before the final commit:
 
-- `web-app/src/containers/code/CodeWorkspace.test.tsx`
-- `web-app/src/containers/code/CodeWorkspace.tsx`
-- `web-app/src/routes/code.tsx`
-- `web-app/src/services/model-router/provider-adapter.test.ts`
-- `web-app/src/services/model-router/provider-adapter.ts`
-- `web-app/src/services/model-router/router.test.ts`
-- `web-app/src/services/model-router/router.ts`
-- `web-app/src/services/model-router/types.ts`
 - `web-app/src/containers/media/MediaGenerationForm.tsx`
 - `web-app/src/containers/media/MediaJobStatus.tsx`
 - `web-app/src/containers/media/MediaPreview.tsx`
@@ -67,10 +61,68 @@ SHA-256 before the final commit:
 - `web-app/src/services/atomicMedia/types.ts`
 
 Shared registration files may be edited only when required to register a new
-backend command or plugin. Their existing Code and Atomic Media registrations
-must remain byte-for-byte equivalent at the relevant declarations. No Code or
-Atomic Media component, route, layout, generation request, model-routing rule,
-or visual behavior may change.
+backend command or plugin, remove Atomic Code, or add the narrowly approved
+configuration UI. Their Atomic Media registrations must remain byte-for-byte
+equivalent at the relevant declarations. No Atomic Media component, route,
+layout, generation request, or visual behavior may change.
+
+## Atomic Code removal
+
+Remove the Atomic Code page and its complete page-specific dependency graph:
+
+- `web-app/src/containers/code/` and `web-app/src/routes/code.tsx`;
+- the `/code` route and generated route-tree registration;
+- the Code workspace entry in the sidebar and chat/agent workspace selector;
+- the Code-only `useModelStrategy` store and `services/model-router` module;
+- the Atomic Code foundation plan, design, and decision record, plus their
+  index entry.
+
+Mixed shared files must be edited surgically. Preserve chat and Agent Mode
+switching, the Atomic Media workspace entry, generic code-block rendering, the
+Launch page's external coding-agent integrations, and Agent Mode's backend
+workspace/indexing tools. Files in the protected Atomic Media list remain
+unchanged even if they were edited in the original Atomic Code foundation
+commit, because their current changes are type-safety or route-generation
+adjustments rather than Atomic Code behavior.
+
+Add a route/navigation regression test proving that `/code` and its workspace
+entry are absent while chat, Agent Mode, and Atomic Media remain reachable.
+
+## Bundled Windows backend matrix
+
+The Windows x64 distribution carries these current stable runtime packages:
+
+1. standard llama.cpp `win-cpu-x64` at `b10431`;
+2. standard llama.cpp `win-cuda12.4-x64` at `b10431`;
+3. the matching standard CUDA 12.4 runtime companion at `b10431`;
+4. TurboQuant `windows-x64-cpu` at `b10269-1.5.1`;
+5. TurboQuant `windows-x64-cuda-12-4` at `b10269-1.5.1`.
+
+These five archives represent the four user-visible choices: Standard CPU,
+Standard CUDA 12.4, TurboQuant CPU, and TurboQuant CUDA 12.4. Build resolution
+is reproducible: committed package metadata pins each release tag, archive
+size, SHA-256 digest, and upstream URL. The Windows release workflow downloads
+and verifies the archives before Tauri packaging and fails closed if any
+artifact is absent or does not match its metadata.
+
+Keep the verified archives compressed inside the installed application rather
+than eagerly expanding all four backends. The runtime installer uses a common
+package-source abstraction: it selects an exact matching bundled archive first
+and extracts it into the existing per-user backend directory; only a backend
+not in the bundled matrix may use the network download source. Switching to a
+bundled CPU or CUDA 12.4 backend therefore requires no network access.
+
+Vulkan, ROCm, CUDA 13.x, and all other variants remain optional downloads using
+the existing manifest-driven updater and the same size/SHA-256 validation. A
+newer release may be offered through the updater, but the pinned bundled
+baseline remains usable offline. Bundling TurboQuant does not enable its
+provider, change fresh-install defaults, or change existing provider behavior.
+
+The measured compressed runtime payload is approximately 1.319 GB, and the
+projected Windows NSIS artifact is approximately 1.399 GB before final
+packaging variance. The build must report the actual packaged size. If the
+result reaches 1.90 GiB, release packaging fails with an actionable size-budget
+error so it remains below the NSIS and GitHub single-asset ceilings.
 
 ## Backend updater and integrity
 
@@ -142,8 +194,9 @@ Atomic Media pages:
   tools where they operate on chat attachments or workspace files.
 
 The local `atomic-code-index` crate is included only as an Agent Mode workspace
-tool. It does not import, call, register, or alter the Code page or the fork's
-frontend model router.
+and symbol-navigation tool. Its name does not make it part of the removed
+Atomic Code page: it must not import, call, register, or recreate any frontend
+Code route, workspace, or model router.
 
 Exclude GAIA evaluation additions, benchmark-only behavior, Code-page UI and
 routes, Atomic Media generation integration, Launch-page additions, API-page
@@ -220,6 +273,10 @@ are additive and idempotent. Existing language namespaces remain registered;
 new strings may fall back to English where an upstream translation does not
 exist, but no locale file or translation key may be removed.
 
+Removing the Atomic Code page may leave its single local-storage preference
+unused. The update removes only the obsolete key declaration; it does not scan
+or delete browser storage, so no unrelated persisted state is touched.
+
 ## Verification
 
 Focused red/green tests cover every new classifier, resolver, deletion branch,
@@ -232,10 +289,16 @@ The final verification gate includes:
 - frontend lint and TypeScript build/typecheck;
 - Rust tests for updater/download integrity, MCP, Agent Mode, auth, audio, and
   affected plugins;
+- offline install tests proving all four user-visible bundled choices resolve
+  without HTTP and optional backends still resolve through the network source;
+- release-staging tests proving every pinned archive is present and verified,
+  and that a corrupt or oversized package fails the build;
 - `cargo check` and `cargo clippy` for the Windows desktop feature set;
 - the repository's `make verify` equivalent available on Windows;
 - a Windows release/build check as far as local signing credentials permit;
-- a final protected-file hash comparison;
+- a final Atomic Media protected-file hash comparison;
+- a final search proving the Atomic Code page, route, sidebar entry, model
+  router, and Code-only documentation are absent;
 - a final dirty-delta comparison confirming the user's four original changes
   are still present.
 
