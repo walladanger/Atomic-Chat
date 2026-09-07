@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "max_total_bytes": 2040109465,
+  "packages": [
+    {
+      "provider": "llamacpp-upstream",
+      "version": "b10431",
+      "backend": "win-cpu-x64",
+      "kind": "backend",
+      "asset": "llama-b10431-bin-win-cpu-x64.zip",
+      "url": "https://github.com/AtomicBot-ai/atomic-chat-conf/releases/download/b10431/llama-b10431-bin-win-cpu-x64.zip",
+      "size": 18853706,
+      "sha256": "631c8f7b237ca901e2b7b07680791a27c4fc23104f1640409e6c0e7c55f57fcf"
+    },
+    {
+      "provider": "llamacpp-upstream",
+      "version": "b10431",
+      "backend": "win-cuda-12.4-x64",
+      "kind": "backend",
+      "asset": "llama-b10431-bin-win-cuda-12.4-x64.zip",
+      "url": "https://github.com/AtomicBot-ai/atomic-chat-conf/releases/download/b10431/llama-b10431-bin-win-cuda-12.4-x64.zip",
+      "size": 250659321,
+      "sha256": "394e12e9151080efe588ba2e6f3609cdfefd5f2f28b7382d784bbceaf32382c9"
+    },
+    {
+      "provider": "llamacpp-upstream",
+      "version": "b10431",
+      "backend": "cudart-win-cuda-12.4-x64",
+      "kind": "companion",
+      "companion_for": "win-cuda-12.4-x64",
+      "asset": "cudart-llama-bin-win-cuda-12.4-x64.zip",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b10431/cudart-llama-bin-win-cuda-12.4-x64.zip",
+      "size": 391443627,
+      "sha256": "8c79a9b226de4b3cacfd1f83d24f962d0773be79f1e7b75c6af4ded7e32ae1d6"
+    },
+    {
+      "provider": "llamacpp",
+      "version": "b10269-1.5.1",
+      "backend": "windows-x64-cpu",
+      "kind": "backend",
+      "asset": "llama-turboquant-windows-x64-cpu.zip",
+      "url": "https://github.com/AtomicBot-ai/atomic-llama-cpp-turboquant/releases/download/b10269-1.5.1/llama-turboquant-windows-x64-cpu.zip",
+      "size": 12135314,
+      "sha256": "6c99dda78bd7cd774a35a2dc5ae02fcf78e6d5a2730f40cadd8e1108523957a6"
+    },
+    {
+      "provider": "llamacpp",
+      "version": "b10269-1.5.1",
+      "backend": "windows-x64-cuda-12.4",
+      "kind": "backend",
+      "asset": "llama-turboquant-windows-x64-cuda-12.4.zip",
+      "url": "https://github.com/AtomicBot-ai/atomic-llama-cpp-turboquant/releases/download/b10269-1.5.1/llama-turboquant-windows-x64-cuda-12.4.zip",
+      "size": 646134779,
+      "sha256": "9f641d36280fc9f5b2a76cd187b0cf1b649ebfcaa8899dc255971dd59c107aea"
+    }
+  ]
+}

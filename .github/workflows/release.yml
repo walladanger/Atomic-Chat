@@ -526,6 +526,17 @@ jobs:
       - name: Download binaries (bun, uv)
         run: yarn download:bin
 
+      - name: Restore verified Windows backend archive cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}\atomic-backend-cache
+          key: windows-backend-bundle-${{ hashFiles('scripts/windows-backend-bundle.json') }}
+
+      - name: Stage verified offline Windows backend archives
+        env:
+          ATOMIC_BACKEND_CACHE_DIR: ${{ runner.temp }}\atomic-backend-cache
+        run: node scripts/stage-windows-backends.mjs
+
       - name: Download upstream llamacpp backend (manifest resolver)
         shell: bash
         run: |
