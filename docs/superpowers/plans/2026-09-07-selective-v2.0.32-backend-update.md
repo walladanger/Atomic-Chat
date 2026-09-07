@@ -41,15 +41,24 @@
 - [ ] **Step 1: Write the failing guard test**
 
 ```js
-test('rejects the current tree while Atomic Code remains registered', () => {
-  const result = spawnSync(process.execPath, ['scripts/verify-selective-v2032.mjs'], {
-    cwd: repoRoot,
-    encoding: 'utf8',
-  })
+test('rejects a fixture tree while Atomic Code remains registered', async () => {
+  const fixture = await makeFixture({ includeAtomicCode: true })
+  const result = runGuard(fixture.root, fixture.protectedManifest)
   assert.notEqual(result.status, 0)
   assert.match(result.stderr, /Atomic Code remains/)
 })
+
+test('accepts a fixture tree with matching protected files and no Atomic Code', async () => {
+  const fixture = await makeFixture({ includeAtomicCode: false })
+  const result = runGuard(fixture.root, fixture.protectedManifest)
+  assert.equal(result.status, 0, result.stderr)
+})
 ```
+
+`runGuard` invokes `verify-selective-v2032.mjs --root <fixture> --protected
+<fixture-manifest>`. `makeFixture` writes one protected file and a literal
+SHA-256 for those bytes; it optionally creates
+`web-app/src/containers/code/CodeWorkspace.tsx`.
 
 - [ ] **Step 2: Run the guard test and confirm RED**
 
@@ -69,7 +78,8 @@ The JSON must contain the eleven exact hashes captured before implementation, in
 }
 ```
 
-The script must hash every JSON entry and reject these paths or symbols:
+The script accepts optional `--root` and `--protected` paths for controlled
+tests. It must hash every JSON entry and reject these paths or symbols:
 
 ```js
 const forbiddenPaths = [
@@ -85,7 +95,9 @@ Add `verify-selective-v2032` to `make verify` without changing other verify targ
 
 - [ ] **Step 4: Run the guard test again**
 
-Expected: the script runs and the test observes its intentional non-zero result with `Atomic Code remains`.
+Expected: both fixture cases PASS. Then run
+`node scripts/verify-selective-v2032.mjs` against the real repository and
+confirm it exits non-zero with `Atomic Code remains` before Task 2.
 
 - [ ] **Step 5: Commit the guard**
 

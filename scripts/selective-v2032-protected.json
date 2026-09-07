@@ -1,0 +1,13 @@
+{
+  "web-app/src/containers/media/MediaGenerationForm.tsx": "0dd507a2485a821bf4533e68566b5f3b9c23d3a05a88cf5319291470d7fa6fff",
+  "web-app/src/containers/media/MediaJobStatus.tsx": "2395f2d4174e991204ce994577b72c04cf393f712db27a5445daf00ab92b4ecc",
+  "web-app/src/containers/media/MediaPreview.tsx": "4a5708bda2615d72ab5a86894437cdaf10f55d52adb827542f80df78a57197cb",
+  "web-app/src/containers/media/MediaStudio.test.tsx": "a989e2426285abbbf8e52c75aed4b569162c6c84b691c4c240717d294000e62d",
+  "web-app/src/containers/media/MediaStudio.tsx": "68716caa1d1a37f2881b92b8093d67a4999548970ddb8cb6bae0243a74001971",
+  "web-app/src/routes/media.tsx": "997102f3082ee9756ddba73339f01c7a3c58bd7151e622481851104bb1f2ea92",
+  "web-app/src/hooks/useAtomicMediaJob.test.tsx": "93d99d3ae2f2e22e673899c95fb05670b41d315d34e7892d8383c840a2bb2f4e",
+  "web-app/src/hooks/useAtomicMediaJob.ts": "289283928eaa2035931f517a75e771043c7aa436c36d387dbf95cccce424625d",
+  "web-app/src/services/atomicMedia/client.test.ts": "15a34279701bd207bf5bdb74e5e9ca9f8c59f9c9a74f0b66826762df6e7a744e",
+  "web-app/src/services/atomicMedia/client.ts": "b60db81445712f88ad8e17bfdd86c6b34f4231c52d6e9ec34540321fc9484197",
+  "web-app/src/services/atomicMedia/types.ts": "5682f1c6ec0c85203e39286754f5af65caf85c2e036ab0dc58e59ced070a85c1"
+}
