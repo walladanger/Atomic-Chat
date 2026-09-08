@@ -53,7 +53,7 @@ function parseArgs(argv) {
   return { root, protectedManifest }
 }
 
-async function hashFile(filePath) {
+export async function hashFile(filePath) {
   const contents = await readFile(filePath)
   return createHash('sha256').update(contents).digest('hex')
 }

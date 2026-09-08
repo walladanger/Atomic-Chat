@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, mkdir, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -7,6 +7,7 @@ import test from 'node:test'
 
 const repoRoot = path.resolve(import.meta.dirname, '..')
 const guardPath = path.join(repoRoot, 'scripts', 'verify-selective-v2032.mjs')
+const rebaselinePath = path.join(repoRoot, 'scripts', 'rebaseline-selective-v2032.mjs')
 const protectedHash =
   '64cbe6c7ba5e93d1f43c5542d8b3f6a27901ebbdffb28b89c3a2a920134976c7'
 
@@ -43,6 +44,14 @@ function runGuard(root, manifest) {
   )
 }
 
+function runRebaseline(root, manifest) {
+  return spawnSync(
+    process.execPath,
+    [rebaselinePath, '--root', root, '--protected', manifest],
+    { cwd: repoRoot, encoding: 'utf8' }
+  )
+}
+
 test('rejects a fixture tree while Atomic Code remains registered', async () => {
   const fixture = await makeFixture({ includeAtomicCode: true })
 
@@ -67,4 +76,35 @@ test('rejects a changed protected file', async () => {
 
   assert.notEqual(result.status, 0)
   assert.match(result.stderr, /Protected file changed: protected\.txt/)
+})
+
+test('re-baselines changed protected files with sorted stable formatting', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'atomic-selective-rebaseline-'))
+  const manifest = path.join(root, 'protected.json')
+
+  await mkdir(path.join(root, 'nested'), { recursive: true })
+  await writeFile(path.join(root, 'nested', 'z.txt'), 'z current content\n')
+  await writeFile(path.join(root, 'a.txt'), 'a current content\n')
+  await writeFile(
+    manifest,
+    JSON.stringify(
+      {
+        'nested/z.txt': protectedHash,
+        'a.txt': protectedHash,
+      },
+      null,
+      2
+    )
+  )
+
+  const rebaseline = runRebaseline(root, manifest)
+  assert.equal(rebaseline.status, 0, rebaseline.stderr)
+
+  const verify = runGuard(root, manifest)
+  assert.equal(verify.status, 0, verify.stderr)
+
+  const rewritten = await readFile(manifest, 'utf8')
+  assert.equal(rewritten.endsWith('\n'), true)
+  assert.deepEqual(Object.keys(JSON.parse(rewritten)), ['a.txt', 'nested/z.txt'])
+  assert.equal(rewritten, `${JSON.stringify(JSON.parse(rewritten), null, 2)}\n`)
 })
