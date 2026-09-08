@@ -171,7 +171,8 @@ defaults on conflict.
 9. **Touching Atomic Media?** Open the tracker linked at the top of this file
    *before* writing anything, work the first row that is not Done, and update
    its Status in the same commit. Task 0 is a hard gate — `make verify` is red
-   until it lands, and decision Q1 is the user's call, not yours.
+   until it lands, and decision Q1 is the user's call, not yours. Starting cold?
+   Use [the kickoff prompt](docs/superpowers/plans/2026-09-08-media-platform-agent-prompt.md).
 
 ---
 
