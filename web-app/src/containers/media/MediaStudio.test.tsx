@@ -104,6 +104,14 @@ describe('MediaStudio', () => {
   it('submits exact baseline registry settings from the form', () => {
     render(<MediaStudio />)
 
+    // The payload must reflect what the form actually shows the user, not a
+    // coincidentally matching set of defaults.
+    expect(screen.getByLabelText('Resolution')).toHaveValue('832x480')
+    expect(screen.getByLabelText('Frames')).toHaveValue(17)
+    expect(screen.getByLabelText('Steps')).toHaveValue(10)
+    expect(screen.getByLabelText('FPS')).toHaveValue(12)
+    expect(screen.getByLabelText('Guidance')).toHaveValue(5)
+
     fireEvent.change(screen.getByLabelText('Prompt'), {
       target: { value: 'A red sports car exits a garage' },
     })
@@ -225,9 +233,14 @@ describe('MediaStudio', () => {
   it('rounds frame counts to the selected model rule before submitting', () => {
     render(<MediaStudio />)
 
-    fireEvent.change(screen.getByLabelText('Frames'), {
-      target: { value: '20' },
-    })
+    const frames = screen.getByLabelText('Frames')
+    fireEvent.change(frames, { target: { value: '20' } })
+    fireEvent.blur(frames)
+
+    // The rule is 4n + 1, so 20 must be corrected to 21 in the field the user
+    // sees — not silently fixed up on the way out.
+    expect(frames).toHaveValue(21)
+
     fireEvent.change(screen.getByLabelText('Prompt'), {
       target: { value: 'A careful camera move through fog' },
     })

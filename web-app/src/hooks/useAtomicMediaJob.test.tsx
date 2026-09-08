@@ -156,6 +156,12 @@ describe('useAtomicMediaJob', () => {
       await result.current.submit(request)
     })
 
+    // Without this the assertion below could pass vacuously: if submit never
+    // established a non-terminal job, there would be no scheduled poll to cancel
+    // and getJob would stay uncalled for the wrong reason.
+    expect(result.current.job?.job_id).toBe('job-1')
+    expect(result.current.job?.status).toBe('queued')
+
     unmount()
     await act(async () => {
       await vi.advanceTimersByTimeAsync(500)
