@@ -109,6 +109,7 @@ import {
   shouldMigrateBackend,
   handleSettingUpdate,
   installBundledBackend,
+  installBundledBackendArchive,
   verifyBackendBinary,
   checkBackendForUpdates as checkBackendForUpdatesFromRust,
   getSupportedFeaturesFromRust,
@@ -5730,13 +5731,30 @@ export default class llamacpp_upstream_extension extends AIEngine {
       return
     }
 
+    const janDataFolderPath = await getJanDataFolderPath()
+    const backendsDir = await joinPath([
+      janDataFolderPath,
+      this.providerId,
+      'backends',
+    ])
+    const bundled = await installBundledBackendArchive(
+      backendsDir,
+      version,
+      backend
+    )
+    if (bundled.installed) {
+      logger.info(
+        `Installed backend ${backendString} from verified application resources`
+      )
+      return
+    }
+
     // Prefers our signed mirror and carries the hash to verify; falls back to
     // the ggml-org CDN (without a hash) for tags that were never mirrored.
     const { url, sha256, size } = await resolveBackendArchiveSource(
       version,
       backend
     )
-    const janDataFolderPath = await getJanDataFolderPath()
     // Temp staging shares the upstream root with the rest of the
     // extension's on-disk state (`llamacpp-upstream/tmp`) so partial
     // downloads can't leak into the turboquant provider's tree.

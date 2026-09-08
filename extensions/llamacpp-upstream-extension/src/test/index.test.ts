@@ -6,6 +6,7 @@ import llamacpp_extension, {
 
 import {
   getSupportedFeaturesFromRust,
+  installBundledBackendArchive,
   loadLlamaModel,
   mapOldBackendToNew,
   normalizeLlamacppConfig,
@@ -74,6 +75,7 @@ vi.mock(
     return {
       ...actual,
       getSupportedFeaturesFromRust: vi.fn(),
+      installBundledBackendArchive: vi.fn(),
       loadLlamaModel: vi.fn(),
       mapOldBackendToNew: vi.fn(),
       readGgufMetadata: vi.fn(),
@@ -106,6 +108,34 @@ describe('llamacpp_extension', () => {
       expect(extension.provider).toBe('llamacpp-upstream')
       expect(extension.providerId).toBe('llamacpp-upstream')
       expect(extension.autoUnload).toBe(false)
+    })
+  })
+
+  describe('bundled backend archives', () => {
+    it('uses an exact bundled backend before resolving a remote download', async () => {
+      const { getJanDataFolderPath, joinPath } = await import('@janhq/core')
+      vi.mocked(isBackendInstalled).mockResolvedValue(false)
+      vi.mocked(getJanDataFolderPath).mockResolvedValue('/data')
+      vi.mocked(joinPath).mockImplementation(async (parts: string[]) =>
+        parts.join('/')
+      )
+      vi.mocked(installBundledBackendArchive).mockResolvedValue({
+        installed: true,
+        backend_string: 'b10431/win-cuda-12.4-x64',
+        version: 'b10431',
+        backend: 'win-cuda-12.4-x64',
+      })
+
+      await extension['downloadAndInstallBackend'](
+        'b10431/win-cuda-12.4-x64'
+      )
+
+      expect(installBundledBackendArchive).toHaveBeenCalledWith(
+        '/data/llamacpp-upstream/backends',
+        'b10431',
+        'win-cuda-12.4-x64'
+      )
+      expect(global.fetch).not.toHaveBeenCalled()
     })
   })
 

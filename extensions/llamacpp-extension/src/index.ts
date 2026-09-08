@@ -87,6 +87,7 @@ import {
   shouldMigrateBackend,
   handleSettingUpdate,
   installBundledBackend,
+  installBundledBackendArchive,
   checkBackendForUpdates as checkBackendForUpdatesFromRust,
   getSupportedFeaturesFromRust,
   normalizeFeatures,
@@ -4468,12 +4469,29 @@ export default class llamacpp_extension extends AIEngine {
       return
     }
 
+    const janDataFolderPath = await getJanDataFolderPath()
+    const backendsDir = await joinPath([
+      janDataFolderPath,
+      'llamacpp',
+      'backends',
+    ])
+    const bundled = await installBundledBackendArchive(
+      backendsDir,
+      version,
+      backend
+    )
+    if (bundled.installed) {
+      logger.info(
+        `Installed backend ${backendString} from verified application resources`
+      )
+      return
+    }
+
     const url = getBackendDownloadUrl(
       version,
       backend,
       getIndexedAssetName(version, backend)
     )
-    const janDataFolderPath = await getJanDataFolderPath()
     const tempDir = await joinPath([janDataFolderPath, 'llamacpp', 'tmp'])
     if (!(await fs.existsSync(tempDir))) {
       await fs.mkdir(tempDir)

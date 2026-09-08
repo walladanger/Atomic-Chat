@@ -61,6 +61,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             backend::should_migrate_backend,
             backend::handle_setting_update,
             backend::install_bundled_backend,
+            backend::install_bundled_backend_archive,
             backend::verify_backend_binary,
             backend::fetch_manifest_http1,
             backend::available_disk_space

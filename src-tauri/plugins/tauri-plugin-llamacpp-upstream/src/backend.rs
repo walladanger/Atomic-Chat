@@ -5,6 +5,10 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use tauri::{Manager, Runtime};
 
+const BUNDLED_PROVIDER: &str = "llamacpp-upstream";
+const BUNDLED_CPU_VERSION: &str = "b10431";
+const BUNDLED_CPU_BACKEND: &str = "win-cpu-x64";
+
 #[tauri::command]
 pub fn map_old_backend_to_new(old_backend: String) -> String {
     // Upstream provider serves two platforms with different naming streams:
@@ -1364,6 +1368,65 @@ pub struct BundledBackendResult {
     pub backend: Option<String>,
 }
 
+fn bundled_package_root<R: Runtime>(app: &tauri::AppHandle<R>) -> Option<PathBuf> {
+    for candidate in &["resources/backend-packages", "backend-packages"] {
+        if let Ok(path) = app
+            .path()
+            .resolve(candidate, tauri::path::BaseDirectory::Resource)
+        {
+            if path.join("manifest.json").is_file() {
+                return Some(path);
+            }
+        }
+    }
+
+    let development_path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../resources/backend-packages");
+    development_path
+        .join("manifest.json")
+        .is_file()
+        .then_some(development_path)
+}
+
+#[tauri::command]
+pub async fn install_bundled_backend_archive<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    backends_dir: String,
+    version: String,
+    backend: String,
+) -> Result<BundledBackendResult, String> {
+    let Some(package_root) = bundled_package_root(&app) else {
+        return Ok(BundledBackendResult {
+            installed: false,
+            backend_string: None,
+            version: None,
+            backend: None,
+        });
+    };
+
+    let installed = jan_utils::backend_bundle::install_bundled_backend_archives(
+        &package_root,
+        BUNDLED_PROVIDER,
+        &version,
+        &backend,
+        &PathBuf::from(backends_dir),
+    )?;
+    Ok(match installed {
+        Some(installed) => BundledBackendResult {
+            installed: true,
+            backend_string: Some(installed.backend_string),
+            version: Some(installed.version),
+            backend: Some(installed.backend),
+        },
+        None => BundledBackendResult {
+            installed: false,
+            backend_string: None,
+            version: None,
+            backend: None,
+        },
+    })
+}
+
 fn copy_dir_recursive(src: &PathBuf, dst: &PathBuf) -> Result<(), String> {
     fs::create_dir_all(dst).map_err(|e| format!("mkdir {}: {}", dst.display(), e))?;
 
@@ -1479,8 +1542,14 @@ pub async fn install_bundled_backend<R: Runtime>(
     let resource_dir = match resource_dir {
         Some(p) => p,
         None => {
-            log::info!("[install_bundled_backend] No bundled backend found in any candidate path");
-            return not_bundled;
+            log::info!("[install_bundled_backend] No legacy expanded backend found; trying the verified CPU archive");
+            return install_bundled_backend_archive(
+                app,
+                backends_dir,
+                BUNDLED_CPU_VERSION.to_string(),
+                BUNDLED_CPU_BACKEND.to_string(),
+            )
+            .await;
         }
     };
 

@@ -37,6 +37,7 @@ Default permissions for the llamacpp plugin
 - `allow-should-migrate-backend`
 - `allow-handle-setting-update`
 - `allow-install-bundled-backend`
+- `allow-install-bundled-backend-archive`
 - `allow-verify-backend-binary`
 - `allow-fetch-manifest-http1`
 - `allow-available-disk-space`
@@ -592,6 +593,32 @@ Enables the install_bundled_backend command without any pre-configured scope.
 <td>
 
 Denies the install_bundled_backend command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`llamacpp-upstream:allow-install-bundled-backend-archive`
+
+</td>
+<td>
+
+Enables the install_bundled_backend_archive command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`llamacpp-upstream:deny-install-bundled-backend-archive`
+
+</td>
+<td>
+
+Denies the install_bundled_backend_archive command without any pre-configured scope.
 
 </td>
 </tr>

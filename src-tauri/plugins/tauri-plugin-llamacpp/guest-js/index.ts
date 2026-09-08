@@ -384,4 +384,16 @@ export async function installBundledBackend(
   return invoke('plugin:llamacpp|install_bundled_backend', { backendsDir })
 }
 
+export async function installBundledBackendArchive(
+  backendsDir: string,
+  version: string,
+  backend: string
+): Promise<BundledBackendResult> {
+  return invoke('plugin:llamacpp|install_bundled_backend_archive', {
+    backendsDir,
+    version,
+    backend,
+  })
+}
+
 export * from './types'
