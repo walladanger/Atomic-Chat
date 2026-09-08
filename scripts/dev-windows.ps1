@@ -277,14 +277,18 @@ function Test-VulkanSupport {
 
 function Test-BackendSatisfiedBy {
     # True when an already-downloaded concrete backend satisfies the selected
-    # backend: an exact match, or a concrete CUDA minor that belongs to the
-    # selected minor-less CUDA family (e.g. win-cuda-13.3-x64 satisfies
-    # win-cuda-13-x64). Avoids a needless re-download on every dev run.
+    # backend: an exact match, or a concrete GPU runtime version that belongs to
+    # the selected version-less GPU family (e.g. win-cuda-13.3-x64 satisfies
+    # win-cuda-13-x64, win-rocm-10.0-x64 satisfies win-rocm-x64). Avoids a
+    # needless re-download on every dev run.
     param([string]$Existing, [string]$Selected)
     if (-not $Existing) { return $false }
     if ($Existing -eq $Selected) { return $true }
     if ($Selected -match '^win-cuda-(\d+)-x64$') {
         return ($Existing -match ('^win-cuda-' + $Matches[1] + '\.\d+-x64$'))
+    }
+    if ($Selected -eq 'win-rocm-x64') {
+        return ($Existing -match '^win-rocm-\d+\.\d+-x64$')
     }
     return $false
 }
@@ -292,8 +296,9 @@ function Test-BackendSatisfiedBy {
 function Resolve-BackendFromManifest {
     # Given the parsed backend manifest object from atomic-chat-conf and a
     # selected backend id, resolve to @{ Backend; Tag; Asset; Url; Sha256; Size }.
-    # Minor-less CUDA family ids (win-cuda-13-x64 / win-cuda-12-x64) are
-    # resolved to the highest concrete minor listed in manifest assets. Mirrors
+    # Version-less GPU family ids (win-cuda-13-x64 / win-cuda-12-x64 /
+    # win-rocm-x64) are resolved to the highest concrete runtime version listed
+    # in manifest assets. Mirrors
     # the runtime resolver in
     # extensions/llamacpp-upstream-extension/src/backend.ts.
     #
@@ -316,6 +321,25 @@ function Resolve-BackendFromManifest {
                 if ($minor -gt $bestMinor) {
                     $bestMinor = $minor
                     $best = "win-cuda-$major.$minor-x64"
+                }
+            }
+        }
+        if (-not $best) { return $null }
+        return New-BackendSource -Manifest $Manifest -Backend $best
+    }
+    if ($Backend -eq 'win-rocm-x64') {
+        $assetRe = '^llama-' + [regex]::Escape($Manifest.tag_name) + '-bin-win-rocm-(\d+)\.(\d+)-x64\.zip$'
+        $best = $null
+        $bestMajor = -1
+        $bestMinor = -1
+        foreach ($a in $Manifest.assets) {
+            if ($a.name -match $assetRe) {
+                $major = [int]$Matches[1]
+                $minor = [int]$Matches[2]
+                if (($major -gt $bestMajor) -or (($major -eq $bestMajor) -and ($minor -gt $bestMinor))) {
+                    $bestMajor = $major
+                    $bestMinor = $minor
+                    $best = "win-rocm-$major.$minor-x64"
                 }
             }
         }

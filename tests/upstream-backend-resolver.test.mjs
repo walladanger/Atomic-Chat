@@ -6,6 +6,7 @@ import {
   assetNameFor,
   pickSource,
   resolveCudaFamily,
+  resolveGpuFamily,
 } from '../scripts/resolve-upstream-backend.mjs'
 
 const GGML_ORG = 'https://github.com/ggml-org/llama.cpp/releases/download'
@@ -53,6 +54,17 @@ test('a CUDA family id resolves to the highest minor the tag ships', () => {
   assert.equal(
     resolveCudaFamily('win-cuda-13.3-x64', 'b10405', assets),
     'win-cuda-13.3-x64'
+  )
+})
+
+test('a ROCm family id resolves to the concrete version the tag ships', () => {
+  const assets = [
+    'llama-b10809-bin-win-rocm-10.0-x64.zip',
+    'llama-b10809-bin-win-cpu-x64.zip',
+  ]
+  assert.equal(
+    resolveGpuFamily('win-rocm-x64', 'b10809', assets),
+    'win-rocm-10.0-x64'
   )
 })
 

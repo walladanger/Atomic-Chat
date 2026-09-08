@@ -43,6 +43,8 @@ const LINUX_ASSET_INFIX = {
 }
 
 const WIN_CUDA_FAMILY_RE = /^win-cuda-(\d+)-x64$/
+const WIN_ROCM_FAMILY_ID = 'win-rocm-x64'
+const WIN_ROCM_CONCRETE_RE = /^win-rocm-(\d+)\.(\d+)-x64$/
 
 function parseArgs(argv) {
   const out = {}
@@ -87,6 +89,49 @@ export function resolveCudaFamily(backend, tag, assetNames) {
   }
   if (best === null) return null
   return `win-cuda-${major}.${best}-x64`
+}
+
+function gpuFamilyConcreteRe(backend, tag) {
+  const cuda = WIN_CUDA_FAMILY_RE.exec(backend)
+  if (cuda) {
+    return new RegExp(
+      `^llama-${tag}-bin-win-cuda-${cuda[1]}\\.(\\d+)-x64\\.zip$`
+    )
+  }
+  if (backend === WIN_ROCM_FAMILY_ID) {
+    return new RegExp(
+      `^llama-${tag}-bin-win-rocm-(\\d+)\\.(\\d+)-x64\\.zip$`
+    )
+  }
+  return null
+}
+
+/**
+ * Resolves version-less Windows GPU family ids to the highest concrete backend
+ * listed by the manifest. CUDA families pin a major; ROCm follows the single
+ * HIP SDK version published for the selected llama.cpp tag.
+ */
+export function resolveGpuFamily(backend, tag, assetNames) {
+  const re = gpuFamilyConcreteRe(backend, tag)
+  if (!re) return backend
+  let best = null
+  for (const name of assetNames) {
+    const match = re.exec(name)
+    if (!match) continue
+    const rank =
+      backend === WIN_ROCM_FAMILY_ID
+        ? [Number(match[1]), Number(match[2])]
+        : [Number(match[1])]
+    if (
+      !best ||
+      rank[0] > best.rank[0] ||
+      (rank[0] === best.rank[0] && (rank[1] ?? 0) > (best.rank[1] ?? 0))
+    ) {
+      best = { rank, name }
+    }
+  }
+  if (!best) return null
+  return best.name.replace(`llama-${tag}-bin-`, '').replace(/\.zip$/, '')
 }
 
 /**
@@ -142,11 +187,14 @@ async function main() {
   if (pinned && !/^b\d+$/.test(pinned)) {
     die(`--tag must look like a ggml-org release tag (got "${pinned}")`)
   }
-  if (pinned && WIN_CUDA_FAMILY_RE.test(backend)) {
-    // The concrete minor is a property of the release, so a pinned tag plus a
-    // minor-less family id has no single answer.
+  if (
+    pinned &&
+    (WIN_CUDA_FAMILY_RE.test(backend) || backend === WIN_ROCM_FAMILY_ID)
+  ) {
+    // The concrete GPU runtime version is a property of the release, so a
+    // pinned tag plus a version-less family id has no single answer.
     die(
-      `--tag cannot be combined with the minor-less family id "${backend}"; pass a concrete id such as win-cuda-13.3-x64`
+      `--tag cannot be combined with the version-less family id "${backend}"; pass a concrete id such as win-cuda-13.3-x64 or win-rocm-10.0-x64`
     )
   }
 
@@ -164,11 +212,11 @@ async function main() {
   const assetNames = (manifest?.assets ?? []).map((a) => a.name)
 
   let resolvedBackend = backend
-  if (WIN_CUDA_FAMILY_RE.test(backend)) {
-    resolvedBackend = resolveCudaFamily(backend, tag, assetNames)
+  if (WIN_CUDA_FAMILY_RE.test(backend) || backend === WIN_ROCM_FAMILY_ID) {
+    resolvedBackend = resolveGpuFamily(backend, tag, assetNames)
     if (!resolvedBackend) {
       die(
-        `manifest tag ${tag} lists no concrete asset for the CUDA family "${backend}" (update atomic-chat-conf/backends/manifest.json)`
+        `manifest tag ${tag} lists no concrete asset for the GPU family "${backend}" (update atomic-chat-conf/backends/manifest.json)`
       )
     }
     process.stderr.write(`Resolved ${backend} -> ${resolvedBackend}\n`)
