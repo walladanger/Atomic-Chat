@@ -8,6 +8,7 @@
  */
 
 import { createAtomicWorkerAdapter } from './adapters/atomicWorker'
+import { createComfyUiAdapter } from './adapters/comfyui'
 import type { MediaProviderAdapter, MediaProviderDescriptor } from './contract'
 
 export class UnknownMediaAdapterError extends Error {
@@ -26,7 +27,9 @@ export function createMediaAdapter(
   switch (descriptor.adapter) {
     case 'atomic-media-worker':
       return createAtomicWorkerAdapter(descriptor)
-    // 'comfyui' arrives in Task 5, 'openai-images' / 'custom-http' in Task 6.
+    case 'comfyui':
+      return createComfyUiAdapter(descriptor)
+    // 'openai-images' / 'custom-http' arrive in Task 6.
     default:
       // Thrown rather than returning a null adapter: a provider configured
       // against an adapter this build does not have is a state the settings UI

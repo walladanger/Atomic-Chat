@@ -1,0 +1,265 @@
+{
+  "_source": {
+    "endpoint": "GET /object_info",
+    "comfyui_version": "0.35.0",
+    "read_from": "github.com/comfyanonymous/ComfyUI@master — server.py node_info(), nodes.py INPUT_TYPES, comfy/samplers.py SAMPLER_NAMES/SCHEDULER_NAMES",
+    "read_on": "2026-09-09",
+    "trimmed": "Only the seven node classes the declared templates use. sampler_name is the first 8 of the 45 SAMPLER_NAMES; scheduler is the complete SCHEDULER_NAMES list. ckpt_name is a two-entry stand-in for folder_paths.get_filename_list('checkpoints'), which is whatever the install has."
+  },
+  "CheckpointLoaderSimple": {
+    "input": {
+      "required": {
+        "ckpt_name": [
+          ["sd_xl_base_1.0.safetensors", "v1-5-pruned-emaonly.safetensors"],
+          { "tooltip": "The name of the checkpoint (model) to load." }
+        ]
+      }
+    },
+    "input_order": { "required": ["ckpt_name"] },
+    "output": ["MODEL", "CLIP", "VAE"],
+    "output_is_list": [false, false, false],
+    "output_name": ["MODEL", "CLIP", "VAE"],
+    "name": "CheckpointLoaderSimple",
+    "display_name": "Load Checkpoint",
+    "description": "Loads a diffusion model checkpoint, diffusion models are used to denoise latents.",
+    "python_module": "nodes",
+    "category": "loaders",
+    "output_node": false
+  },
+  "CLIPTextEncode": {
+    "input": {
+      "required": {
+        "text": [
+          "STRING",
+          {
+            "multiline": true,
+            "dynamicPrompts": true,
+            "tooltip": "The text to be encoded."
+          }
+        ],
+        "clip": ["CLIP", { "tooltip": "The CLIP model used for encoding the text." }]
+      }
+    },
+    "input_order": { "required": ["text", "clip"] },
+    "output": ["CONDITIONING"],
+    "output_is_list": [false],
+    "output_name": ["CONDITIONING"],
+    "name": "CLIPTextEncode",
+    "display_name": "CLIP Text Encode (Prompt)",
+    "description": "Encodes a text prompt using a CLIP model into an embedding that can be used to guide the diffusion model towards generating specific images.",
+    "python_module": "nodes",
+    "category": "conditioning",
+    "output_node": false
+  },
+  "EmptyLatentImage": {
+    "input": {
+      "required": {
+        "width": [
+          "INT",
+          {
+            "default": 512,
+            "min": 16,
+            "max": 16384,
+            "step": 8,
+            "tooltip": "The width of the latent images in pixels."
+          }
+        ],
+        "height": [
+          "INT",
+          {
+            "default": 512,
+            "min": 16,
+            "max": 16384,
+            "step": 8,
+            "tooltip": "The height of the latent images in pixels."
+          }
+        ],
+        "batch_size": [
+          "INT",
+          {
+            "default": 1,
+            "min": 1,
+            "max": 4096,
+            "tooltip": "The number of latent images in the batch."
+          }
+        ]
+      }
+    },
+    "input_order": { "required": ["width", "height", "batch_size"] },
+    "output": ["LATENT"],
+    "output_is_list": [false],
+    "output_name": ["LATENT"],
+    "name": "EmptyLatentImage",
+    "display_name": "Empty Latent Image",
+    "description": "Create a new batch of empty latent images to be denoised via sampling.",
+    "python_module": "nodes",
+    "category": "latent",
+    "output_node": false
+  },
+  "KSampler": {
+    "input": {
+      "required": {
+        "model": ["MODEL", { "tooltip": "The model used for denoising the input latent." }],
+        "seed": [
+          "INT",
+          {
+            "default": 0,
+            "min": 0,
+            "max": 18446744073709551615,
+            "control_after_generate": true,
+            "tooltip": "The random seed used for creating the noise."
+          }
+        ],
+        "steps": [
+          "INT",
+          {
+            "default": 20,
+            "min": 1,
+            "max": 10000,
+            "tooltip": "The number of steps used in the denoising process."
+          }
+        ],
+        "cfg": [
+          "FLOAT",
+          {
+            "default": 8.0,
+            "min": 0.0,
+            "max": 100.0,
+            "step": 0.1,
+            "round": 0.01,
+            "tooltip": "The Classifier-Free Guidance scale balances creativity and adherence to the prompt."
+          }
+        ],
+        "sampler_name": [
+          [
+            "euler",
+            "euler_cfg_pp",
+            "euler_ancestral",
+            "euler_ancestral_cfg_pp",
+            "heun",
+            "heunpp2",
+            "dpm_2",
+            "dpmpp_2m"
+          ],
+          { "tooltip": "The algorithm used when sampling." }
+        ],
+        "scheduler": [
+          [
+            "simple",
+            "sgm_uniform",
+            "karras",
+            "exponential",
+            "ddim_uniform",
+            "beta",
+            "normal",
+            "linear_quadratic",
+            "kl_optimal"
+          ],
+          { "tooltip": "The scheduler controls how noise is gradually removed to form the image." }
+        ],
+        "positive": ["CONDITIONING", { "tooltip": "The conditioning describing the attributes you want to include." }],
+        "negative": ["CONDITIONING", { "tooltip": "The conditioning describing the attributes you want to exclude." }],
+        "latent_image": ["LATENT", { "tooltip": "The latent image to denoise." }],
+        "denoise": [
+          "FLOAT",
+          {
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01,
+            "tooltip": "The amount of denoising applied."
+          }
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "model",
+        "seed",
+        "steps",
+        "cfg",
+        "sampler_name",
+        "scheduler",
+        "positive",
+        "negative",
+        "latent_image",
+        "denoise"
+      ]
+    },
+    "output": ["LATENT"],
+    "output_is_list": [false],
+    "output_name": ["LATENT"],
+    "name": "KSampler",
+    "display_name": "KSampler",
+    "description": "Uses the provided model, positive and negative conditioning to denoise the latent image.",
+    "python_module": "nodes",
+    "category": "sampling",
+    "output_node": false
+  },
+  "LatentUpscale": {
+    "input": {
+      "required": {
+        "samples": ["LATENT"],
+        "upscale_method": [["nearest-exact", "bilinear", "area", "bicubic", "bislerp"]],
+        "width": ["INT", { "default": 512, "min": 0, "max": 16384, "step": 8 }],
+        "height": ["INT", { "default": 512, "min": 0, "max": 16384, "step": 8 }],
+        "crop": [["disabled", "center"]]
+      }
+    },
+    "input_order": {
+      "required": ["samples", "upscale_method", "width", "height", "crop"]
+    },
+    "output": ["LATENT"],
+    "output_is_list": [false],
+    "output_name": ["LATENT"],
+    "name": "LatentUpscale",
+    "display_name": "Upscale Latent",
+    "description": "",
+    "python_module": "nodes",
+    "category": "latent",
+    "output_node": false
+  },
+  "VAEDecode": {
+    "input": {
+      "required": {
+        "samples": ["LATENT", { "tooltip": "The latent to be decoded." }],
+        "vae": ["VAE", { "tooltip": "The VAE model used for decoding the latent." }]
+      }
+    },
+    "input_order": { "required": ["samples", "vae"] },
+    "output": ["IMAGE"],
+    "output_is_list": [false],
+    "output_name": ["IMAGE"],
+    "name": "VAEDecode",
+    "display_name": "VAE Decode",
+    "description": "Decodes latent images back into pixel space images.",
+    "python_module": "nodes",
+    "category": "latent",
+    "output_node": false
+  },
+  "SaveImage": {
+    "input": {
+      "required": {
+        "images": ["IMAGE", { "tooltip": "The images to save." }],
+        "filename_prefix": [
+          "STRING",
+          {
+            "default": "ComfyUI",
+            "tooltip": "The prefix for the file to save."
+          }
+        ]
+      },
+      "hidden": { "prompt": "PROMPT", "extra_pnginfo": "EXTRA_PNGINFO" }
+    },
+    "input_order": { "required": ["images", "filename_prefix"] },
+    "output": [],
+    "output_is_list": [],
+    "output_name": [],
+    "name": "SaveImage",
+    "display_name": "Save Image",
+    "description": "Saves the input images to your ComfyUI output directory.",
+    "python_module": "nodes",
+    "category": "image",
+    "output_node": true
+  }
+}
