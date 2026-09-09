@@ -316,7 +316,7 @@ lint: install-and-build
 	yarn lint
 
 # Testing
-.PHONY: test test-all test-local test-web test-extensions test-rust stub-resources \
+.PHONY: test test-all test-local test-web test-extensions test-rust stub-resources app-icons \
 	test-selective-v2032 rebaseline-selective-v2032 stage-windows-backends verify-windows-backends \
 	typecheck verify-fast verify test-quality test-hardening-contracts \
 	test-coverage-critical capture-capabilities capture-hw-profile \
@@ -377,8 +377,27 @@ else
 	@[ -e src-tauri/resources/llamacpp-backend-upstream/test-placeholder ] || touch src-tauri/resources/llamacpp-backend-upstream/test-placeholder
 endif
 
+# tauri-build renders a Windows Resource file from icons/icon.ico while
+# compiling, and no TAURI_CONFIG override avoids it: narrowing bundle.icon to
+# the one tracked file still fails with "`icons/icon.ico` not found". Every icon
+# except icons/icon.png is a generated artefact excluded by .gitignore, so a
+# fresh checkout has none of them and test-rust cannot compile until they exist.
+# Generate them from the tracked master when the platform's required icon is
+# missing, and never overwrite a real local build.
+app-icons:
+ifeq ($(OS),Windows_NT)
+	powershell -NoProfile -Command "\
+		if (Test-Path 'src-tauri/icons/icon.ico') { exit 0 }; \
+		yarn build:icon; \
+		exit $$LASTEXITCODE"
+else ifeq ($(shell uname -s),Darwin)
+	@[ -e src-tauri/icons/icon.icns ] || yarn build:icon
+else
+	@[ -e src-tauri/icons/32x32.png ] || yarn build:icon
+endif
+
 test-rust: export TAURI_CONFIG := {"bundle":{"icon":["icons/icon.png"]}}
-test-rust: stub-resources
+test-rust: stub-resources app-icons
 	cargo test --manifest-path src-tauri/Cargo.toml --no-default-features --features test-tauri -- --test-threads=1
 	cargo test --manifest-path src-tauri/plugins/tauri-plugin-hardware/Cargo.toml
 	cargo test --manifest-path src-tauri/plugins/tauri-plugin-llamacpp/Cargo.toml
