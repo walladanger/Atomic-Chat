@@ -117,13 +117,30 @@ function formatCatalogFileSize(bytes?: number): string | undefined {
 
 // MTP (Multi-Token Prediction) companion GGUFs are speculative-decoding heads,
 // not standalone models, so we keep them out of the downloadable quant list.
-// Match only dedicated MTP files: an `MTP/` folder, or `mtp` as a leading/trailing
-// filename token. `mtp` mid-name (e.g. Qwen built-in-MTP full models) is left intact.
+// Match dedicated MTP files in an `MTP/` folder or with a leading `mtp` token.
+// Keep other MTP names, including full weights with built-in MTP layers.
 export function isMtpCompanionFile(rfilename: string): boolean {
   const lower = rfilename.toLowerCase()
   if (/(^|\/)mtp\//.test(lower)) return true
   const base = (lower.split('/').pop() ?? lower).replace(/\.gguf$/, '')
-  return /^mtp[-_.]/.test(base) || /[-_]mtp$/.test(base)
+  return /^mtp[-_.]/.test(base)
+}
+
+export function isNonWeightGgufFile(rfilename: string): boolean {
+  const base = (rfilename.toLowerCase().split('/').pop() ?? rfilename)
+    .replace(/\.gguf$/, '')
+
+  return (
+    base.startsWith('mmproj') ||
+    base.startsWith('imatrix') ||
+    base.endsWith('.imatrix') ||
+    base.startsWith('dflash-') ||
+    base.startsWith('eagle3-') ||
+    base.startsWith('ggml-vocab') ||
+    base.startsWith('tokenizer-') ||
+    base.startsWith('vocoder-') ||
+    base.startsWith('audiodecoder-')
+  )
 }
 
 // A quant too large for one file is published as `-00001-of-000NN` shards, and
@@ -223,6 +240,18 @@ export function stripMtpCompanionQuants<
   const quants = model.quants.filter(
     (q) => !isMtpCompanionFile(q.path || q.model_id)
   )
+  if (quants.length === model.quants.length) return model
+  return { ...model, quants, num_quants: quants.length }
+}
+
+export function stripNonWeightQuants<
+  T extends Pick<CatalogModel, 'quants' | 'num_quants'>,
+>(model: T): T {
+  if (!model.quants?.length) return model
+  const quants = model.quants.filter((q) => {
+    const filename = q.path || q.model_id
+    return !isMtpCompanionFile(filename) && !isNonWeightGgufFile(filename)
+  })
   if (quants.length === model.quants.length) return model
   return { ...model, quants, num_quants: quants.length }
 }

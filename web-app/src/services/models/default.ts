@@ -7,6 +7,7 @@ import {
   ggufShardGroupKey,
   groupGgufShards,
   isMtpCompanionFile,
+  isNonWeightGgufFile,
 } from '@/lib/models'
 import {
   AIEngine,
@@ -324,7 +325,8 @@ export class DefaultModelsService implements ModelsService {
     const regularGgufFiles = ggufFiles.filter(
       (file) =>
         !file.rfilename.toLowerCase().includes('mmproj') &&
-        !isMtpCompanionFile(file.rfilename)
+        !isMtpCompanionFile(file.rfilename) &&
+        !isNonWeightGgufFile(file.rfilename)
     )
 
     const mmprojFiles = ggufFiles.filter((file) =>

@@ -30,7 +30,7 @@ describe('DefaultModelsService Hugging Face conversion', () => {
         blobId: 'mmproj',
       },
       {
-        rfilename: 'vision-model-MTP.gguf',
+        rfilename: 'mtp-vision-model.gguf',
         size: 256 * 1024 ** 2,
         blobId: 'mtp',
       },
@@ -76,6 +76,24 @@ describe('DefaultModelsService Hugging Face conversion', () => {
     expect(result.quants).toHaveLength(1)
     expect(result.quants[0].path).not.toContain('MTP')
     expect(result.quants[0].path).not.toContain('README')
+  })
+
+  it('filters auxiliary GGUF files while retaining full weights with MTP layers', () => {
+    const result = service.convertHfRepoToCatalogModel({
+      ...repo,
+      siblings: [
+        { rfilename: 'vision-model-Q6_K_MTP.gguf', size: 2 * 1024 ** 3 },
+        { rfilename: 'imatrix_vision.gguf', size: 1024 },
+        { rfilename: 'tokenizer-vision.gguf', size: 1024 },
+        { rfilename: 'dflash-vision.gguf', size: 1024 },
+        { rfilename: 'mtp/vision.gguf', size: 1024 },
+      ],
+    })
+
+    expect(result.num_quants).toBe(1)
+    expect(result.quants.map((quant) => quant.path)).toEqual([
+      'https://huggingface.co/acme/vision-model/resolve/main/vision-model-Q6_K_MTP.gguf',
+    ])
   })
 
   describe('sharded quants', () => {

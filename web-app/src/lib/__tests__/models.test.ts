@@ -9,7 +9,10 @@ import {
   getModelCapabilities,
   ggufShardGroupKey,
   groupGgufShards,
+  isMtpCompanionFile,
+  isNonWeightGgufFile,
   mergeShardedQuants,
+  stripNonWeightQuants,
 } from '../models'
 import { ModelCapabilities } from '@/types/models'
 import type { CatalogModel } from '@/services/models/types'
@@ -54,6 +57,95 @@ describe('ggufShardGroupKey', () => {
     expect(ggufShardGroupKey('model-00001-of-00003-extra.gguf')).toBe(
       'model-00001-of-00003-extra.gguf'
     )
+  })
+})
+
+describe('isNonWeightGgufFile', () => {
+  it.each([
+    'mmproj-model-f16.gguf',
+    'imatrix_unsloth.gguf',
+    'imatrix-coding.gguf',
+    'Ling-3.0-flash.imatrix.gguf',
+    'dflash-kquant.gguf',
+    'dflash-gemma-4-26b-a4b-it-q8_0.gguf',
+    'eagle3-gpt-oss-20b-q8_0.gguf',
+    'ggml-vocab-gemma-3.gguf',
+    'tokenizer-LFM2.5-Audio-1.5B-Q8_0.gguf',
+    'vocoder-LFM2.5-Audio-1.5B-f16.gguf',
+    'audiodecoder-LFM2-Audio-1.5B-q8_0.gguf',
+  ])('drops %s', (file) => {
+    expect(isNonWeightGgufFile(file)).toBe(true)
+  })
+
+  it.each([
+    'Qwen3-Coder-30B-A3B-Instruct-UD-Q4_K_XL.gguf',
+    'Qwen3.5-9B-The-Defiant-Fable-NEO-IMATRIX-MAX-MTP.Q4_K_M.gguf',
+    'mistral-7b-v0.2-iq3_s-imat.gguf',
+    'Qwen3.5-9B-DFlash.Q8_0.gguf',
+    'wavtokenizer-large-75-f16.gguf',
+    'UD-IQ1_M/Kimi-K3-UD-IQ1_M-00001-of-00003.gguf',
+  ])('keeps %s', (file) => {
+    expect(isNonWeightGgufFile(file)).toBe(false)
+  })
+})
+
+describe('isMtpCompanionFile', () => {
+  it('drops dedicated MTP heads', () => {
+    expect(isMtpCompanionFile('mtp/mtp-gemma-4-12B-it-Q8_0.gguf')).toBe(true)
+    expect(isMtpCompanionFile('mtp-Qwen3.8-27B-Q4_0.gguf')).toBe(true)
+  })
+
+  it('keeps full weights with built-in MTP layers', () => {
+    expect(isMtpCompanionFile('Qwen3.6-27B-UDT-Q6_K_MTP.gguf')).toBe(false)
+    expect(isMtpCompanionFile('Qwen3.6-35B-A3B-UDT-Q8_K_XL_MTP.gguf')).toBe(
+      false
+    )
+  })
+})
+
+describe('stripNonWeightQuants', () => {
+  const entry = () =>
+    ({
+      num_quants: 3,
+      quants: [
+        {
+          model_id: 'unsloth/Qwen3.8-27B-UD-Q4_K_XL',
+          path: 'https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/resolve/main/Qwen3.8-27B-UD-Q4_K_XL.gguf',
+          file_size: '16.5 GB',
+        },
+        {
+          model_id: 'unsloth/imatrix_unsloth',
+          path: 'https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/resolve/main/imatrix_unsloth.gguf',
+          file_size: '13.0 MB',
+        },
+        {
+          model_id: 'unsloth/mtp/mtp-Qwen3.8-27B-Q4_0',
+          path: 'https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/resolve/main/mtp/mtp-Qwen3.8-27B-Q4_0.gguf',
+          file_size: '311.0 MB',
+        },
+      ],
+    }) as CatalogModel
+
+  it('leaves only runnable weights and recounts them', () => {
+    const stripped = stripNonWeightQuants(entry())
+    expect(stripped.quants.map((quant) => quant.model_id)).toEqual([
+      'unsloth/Qwen3.8-27B-UD-Q4_K_XL',
+    ])
+    expect(stripped.num_quants).toBe(1)
+  })
+
+  it('returns a clean entry untouched', () => {
+    const clean = {
+      num_quants: 1,
+      quants: [
+        {
+          model_id: 'unsloth/Qwen3.8-27B-UD-Q4_K_XL',
+          path: 'Qwen3.8-27B-UD-Q4_K_XL.gguf',
+          file_size: '16.5 GB',
+        },
+      ],
+    } as CatalogModel
+    expect(stripNonWeightQuants(clean)).toBe(clean)
   })
 })
 
