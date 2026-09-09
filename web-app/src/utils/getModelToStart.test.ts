@@ -25,6 +25,27 @@ beforeEach(() => {
 })
 
 describe('getModelToStart', () => {
+  it('falls back to a usable local model when the saved selection is corrupt', () => {
+    localStorage.setItem(localStorageKey.lastUsedModel, '{invalid json')
+    const provider = makeProvider('llamacpp-upstream', ['model-b'])
+
+    expect(getModelToStart({ getProviderByName: lookup([provider]) })).toEqual({
+      model: 'model-b',
+      provider,
+    })
+  })
+
+  it('uses the current selection on an active provider before the local fallback', () => {
+    const local = makeProvider('llamacpp-upstream', ['model-b'])
+    const selected = makeProvider('custom-provider', ['selected-model'])
+
+    expect(getModelToStart({
+      selectedModel: { id: 'selected-model' } as never,
+      selectedProvider: 'custom-provider',
+      getProviderByName: lookup([local, selected]),
+    })).toEqual({ model: 'selected-model', provider: selected })
+  })
+
   it('skips a deactivated provider when picking the first local model', () => {
     const providers = [
       makeProvider('llamacpp-upstream', [], true),

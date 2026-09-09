@@ -3,7 +3,7 @@ import { formatDate } from '../formatDate'
 
 describe('formatDate', () => {
   it('formats Date objects correctly', () => {
-    const date = new Date('2023-12-25T15:30:45Z')
+    const date = new Date(2023, 11, 25, 15, 30, 45)
     const formatted = formatDate(date)
     
     // The exact format depends on the system locale, but it should include key components
@@ -13,7 +13,7 @@ describe('formatDate', () => {
   })
 
   it('formats ISO string dates correctly', () => {
-    const isoString = '2023-01-15T09:45:30Z'
+    const isoString = new Date(2023, 0, 15, 9, 45, 30).toISOString()
     const formatted = formatDate(isoString)
     
     expect(formatted).toMatch(/Jan.*15.*2023/i)
@@ -22,7 +22,7 @@ describe('formatDate', () => {
   })
 
   it('formats timestamp numbers correctly', () => {
-    const timestamp = 1703519445000 // Dec 25, 2023 15:30:45 UTC
+    const timestamp = new Date(2023, 11, 25, 15, 30, 45).getTime()
     const formatted = formatDate(timestamp)
     
     expect(formatted).toMatch(/Dec.*25.*2023/i)
@@ -32,10 +32,10 @@ describe('formatDate', () => {
 
   it('handles different months correctly', () => {
     const dates = [
-      '2023-01-01T12:00:00Z',
-      '2023-02-01T12:00:00Z',
-      '2023-03-01T12:00:00Z',
-      '2023-12-01T12:00:00Z'
+      new Date(2023, 0, 1, 12),
+      new Date(2023, 1, 1, 12),
+      new Date(2023, 2, 1, 12),
+      new Date(2023, 11, 1, 12)
     ]
     
     const formatted = dates.map((d) => formatDate(d))
@@ -59,8 +59,8 @@ describe('formatDate', () => {
   })
 
   it('handles edge cases', () => {
-    // Test with very old and very new dates
-    const oldDate = '1900-01-01T00:00:00Z'
+    // Use local time because formatDate displays the user's local calendar date.
+    const oldDate = new Date(1900, 0, 1, 12)
     const futureDate = '2099-12-31T23:59:59Z'
     
     expect(() => formatDate(oldDate)).not.toThrow()
@@ -73,7 +73,7 @@ describe('formatDate', () => {
   })
 
   it('uses en-US locale formatting', () => {
-    const date = '2023-07-04T12:00:00Z'
+    const date = new Date(2023, 6, 4, 12)
     const formatted = formatDate(date)
     
     // Should use US-style date formatting (Month Day, Year)
@@ -83,7 +83,7 @@ describe('formatDate', () => {
   })
 
   it('supports date-only formatting when includeTime=false', () => {
-    const date = '2023-07-04T12:00:00Z'
+    const date = new Date(2023, 6, 4, 12)
     const formatted = formatDate(date, { includeTime: false })
 
     // Long month, no time
