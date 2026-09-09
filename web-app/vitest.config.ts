@@ -9,6 +9,12 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     globals: true,
     css: true,
+    // The coverage run spawns one instrumented worker per core, so on
+    // many-core machines individual (otherwise sub-second) tests can be starved
+    // of CPU past the 5s default and time out under load. Raise the ceiling so a
+    // slow-to-schedule test is not mistaken for a hang; fast tests still finish
+    // fast, and this is harmless on lightly loaded CI.
+    testTimeout: 30000,
     coverage: {
       reporter: ['text', 'json', 'json-summary', 'html', 'lcov'],
       include: ['src/**/*.{ts,tsx}'],

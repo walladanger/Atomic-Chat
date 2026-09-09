@@ -192,9 +192,31 @@ mod tests {
         std::fs::remove_dir_all(&tmp).ok();
     }
 
+    /// A rooted path whose whole chain is absent must round-trip unchanged.
+    /// Gated to Unix like its siblings above: on Windows a leading `/`
+    /// canonicalizes to the current drive root (which exists), so the tail is
+    /// re-attached and the "nothing exists" premise cannot hold. The Windows
+    /// equivalent below uses an unmounted drive letter to reach the same state.
+    #[cfg(unix)]
     #[test]
     fn a_path_with_nothing_existing_is_returned_unchanged() {
         let path = Path::new("/definitely/not/here/at/all.gguf");
+        assert_eq!(canonicalize_existing_prefix(path), path.to_path_buf());
+    }
+
+    /// Windows counterpart: a path on an unmounted drive has no existing
+    /// ancestor (a drive root with no parent), so it must round-trip unchanged.
+    #[cfg(windows)]
+    #[test]
+    fn a_path_with_nothing_existing_is_returned_unchanged() {
+        // Pick a drive letter whose root does not exist, so no ancestor of the
+        // path can canonicalize.
+        let drive = ('D'..='Z')
+            .rev()
+            .find(|d| !Path::new(&format!("{d}:\\")).exists())
+            .expect("expected at least one unmounted drive letter");
+        let raw = format!("{drive}:\\definitely\\not\\here\\at\\all.gguf");
+        let path = Path::new(&raw);
         assert_eq!(canonicalize_existing_prefix(path), path.to_path_buf());
     }
 
