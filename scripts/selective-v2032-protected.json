@@ -7,7 +7,7 @@
   "web-app/src/hooks/useAtomicMediaJob.test.tsx": "585f25016268b288301217dabad13237f14736fecff2aa9aade69a530874535d",
   "web-app/src/hooks/useAtomicMediaJob.ts": "29ab7f4cd909ba83037d9db288062fb41743808f04c84396cac4a2b4aed252d1",
   "web-app/src/routes/media.tsx": "997102f3082ee9756ddba73339f01c7a3c58bd7151e622481851104bb1f2ea92",
-  "web-app/src/services/atomicMedia/client.test.ts": "3eec95f17d6a0e61ba7133196fbed15f47d8f80e4dc171d9f4e4fa451849df05",
-  "web-app/src/services/atomicMedia/client.ts": "f6709e97ceafd65be380b396823de745d7d2822664a915a1146c91bfb8aa44a1",
+  "web-app/src/services/atomicMedia/client.test.ts": "e51009e8936cd5cab27d39bb379c2b51de56da1bf43ed84cb0f78cbe876ddac3",
+  "web-app/src/services/atomicMedia/client.ts": "06303c6464998b358b17376bd613e3d872898630e7ddeb0070c0435c46639340",
   "web-app/src/services/atomicMedia/types.ts": "673f0774e43c18a262a5a1e316dd32d57fdabe3f2130ebb3758c36abc5d6c434"
 }
