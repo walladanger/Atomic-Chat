@@ -88,16 +88,24 @@ function asHealth(value: unknown): AtomicMediaHealth {
   }
 }
 
+/**
+ * Every request method takes an optional `AbortSignal` and forwards it to
+ * `fetch`. Without that an abandoned request keeps running to completion: the
+ * caller stops waiting but the work does not stop, which the media adapter
+ * conformance suite requires of every provider.
+ */
 export class AtomicMediaClient {
   constructor(private readonly baseUrl = ATOMIC_MEDIA_BASE_URL) {}
 
-  async health(): Promise<AtomicMediaHealth> {
-    return asHealth(await this.requestJson('/health'))
+  async health(signal?: AbortSignal): Promise<AtomicMediaHealth> {
+    return asHealth(await this.requestJson('/health', { signal }))
   }
 
-  async capabilities(): Promise<AtomicMediaCapabilities | null> {
+  async capabilities(
+    signal?: AbortSignal
+  ): Promise<AtomicMediaCapabilities | null> {
     try {
-      const value = await this.requestJson('/capabilities')
+      const value = await this.requestJson('/capabilities', { signal })
       if (!isRecord(value)) {
         throw new AtomicMediaClientError(
           'Atomic Media Worker returned invalid capabilities.',
@@ -114,19 +122,26 @@ export class AtomicMediaClient {
     }
   }
 
-  async createJob(request: AtomicMediaJobRequest): Promise<AtomicMediaJobSnapshot> {
+  async createJob(
+    request: AtomicMediaJobRequest,
+    signal?: AbortSignal
+  ): Promise<AtomicMediaJobSnapshot> {
     return asJobSnapshot(
       await this.requestJson('/jobs', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(request),
+        signal,
       })
     )
   }
 
-  async getJob(jobId: string): Promise<AtomicMediaJobSnapshot> {
+  async getJob(
+    jobId: string,
+    signal?: AbortSignal
+  ): Promise<AtomicMediaJobSnapshot> {
     return asJobSnapshot(
-      await this.requestJson(`/jobs/${encodeURIComponent(jobId)}`)
+      await this.requestJson(`/jobs/${encodeURIComponent(jobId)}`, { signal })
     )
   }
 

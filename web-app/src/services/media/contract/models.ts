@@ -109,3 +109,13 @@ export type MediaCapabilities = {
 
 /** Contract version this build speaks. */
 export const MEDIA_CONTRACT_VERSION = 2 as const
+
+/**
+ * Version negotiation window (plan section 5.2).
+ *
+ * A provider reporting 1 is upcast; 2 is used directly. Anything higher must be
+ * refused outright rather than partially parsed - a half-understood future
+ * contract silently generates with settings the user did not choose.
+ */
+export const MEDIA_CONTRACT_MIN_SUPPORTED = 1
+export const MEDIA_CONTRACT_MAX_SUPPORTED = 2

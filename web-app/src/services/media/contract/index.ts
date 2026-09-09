@@ -28,6 +28,8 @@ export {
 } from './params'
 
 export {
+  MEDIA_CONTRACT_MAX_SUPPORTED,
+  MEDIA_CONTRACT_MIN_SUPPORTED,
   MEDIA_CONTRACT_VERSION,
   type MediaCapabilities,
   type MediaDeviceDescriptor,
@@ -37,6 +39,8 @@ export {
   type MediaModelDescriptor,
   type MediaProviderFeatures,
 } from './models'
+
+export { downcastV2Request, upcastV1Capabilities } from './upcast'
 
 export {
   type MediaJobError,
