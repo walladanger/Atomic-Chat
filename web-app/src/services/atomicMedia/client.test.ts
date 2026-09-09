@@ -1,9 +1,22 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import {
-  ATOMIC_MEDIA_DEFAULT_VIDEO_REQUEST,
-  AtomicMediaClient,
-  AtomicMediaClientError,
-} from './client'
+import type { AtomicMediaJobRequest } from './types'
+
+import { AtomicMediaClient, AtomicMediaClientError } from './client'
+
+// A representative video request, local to this test. It used to be
+// ATOMIC_MEDIA_DEFAULT_VIDEO_REQUEST exported from client.ts, but shipping one
+// model's defaults inside the client is coupling C8: the client has no business
+// knowing what a good frame count is. Only these tests ever needed it.
+const videoRequest: Omit<AtomicMediaJobRequest, 'prompt'> = {
+  kind: 'text_to_video',
+  device: 'auto',
+  width: 832,
+  height: 480,
+  num_frames: 17,
+  steps: 10,
+  fps: 12,
+  guidance_scale: 5,
+}
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -68,7 +81,7 @@ describe('AtomicMediaClient', () => {
 
     const client = new AtomicMediaClient()
     await client.createJob({
-      ...ATOMIC_MEDIA_DEFAULT_VIDEO_REQUEST,
+      ...videoRequest,
       prompt: 'A red sports car exits a garage',
     })
 
@@ -145,7 +158,7 @@ describe('AtomicMediaClient', () => {
     const client = new AtomicMediaClient()
     await expect(
       client.createJob({
-        ...ATOMIC_MEDIA_DEFAULT_VIDEO_REQUEST,
+        ...videoRequest,
         prompt: 'test',
       })
     ).rejects.toBeInstanceOf(AtomicMediaClientError)

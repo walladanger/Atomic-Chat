@@ -1,0 +1,61 @@
+{
+  "_source": {
+    "kind": "embedded_test_fixture",
+    "captured_from": "web-app/src/containers/media/MediaStudio.test.tsx:9-58",
+    "captured_on": "2026-09-09",
+    "reason": "A live capture from a running Atomic Media Worker is preferred (plan Task 2 Step 1). No worker was reachable on http://127.0.0.1:13420 at capture time (connection refused, nothing listening), so the plan's sanctioned laptop fallback was used and the payload is copied verbatim from the MediaStudio test fixture.",
+    "note": "Representative v1 payload: resolutions, frame_rule, ranges, supports, fitness and a recommendation are all exercised. If a live payload is ever captured on the GPU box, replace `payload` below and update this block; the parity test should keep passing unchanged.",
+    "contract_version_observed": 1
+  },
+  "payload": {
+    "contract_version": 1,
+    "devices": [{ "id": "cuda:0", "label": "RTX 3090", "backend": "cuda" }],
+    "models": [
+      {
+        "id": "registry-video",
+        "label": "Registry Video",
+        "backend": "comfyui",
+        "installed": true,
+        "kinds": ["text_to_video", "image_to_video"],
+        "resolutions": [
+          { "width": 832, "height": 480 },
+          { "width": 1280, "height": 704 }
+        ],
+        "frame_rule": { "modulus": 4, "offset": 1, "min": 17, "max": 121 },
+        "defaults": {
+          "width": 832,
+          "height": 480,
+          "num_frames": 17,
+          "fps": 12,
+          "steps": 10,
+          "guidance_scale": 5
+        },
+        "ranges": {
+          "steps": { "min": 1, "max": 60 },
+          "guidance_scale": { "min": 0, "max": 15 },
+          "fps": { "min": 8, "max": 30 }
+        },
+        "supports": {
+          "negative_prompt": true,
+          "seed": true,
+          "input_image": true
+        },
+        "fitness": { "status": "recommended", "required_device": "cuda:0" }
+      }
+    ],
+    "recommended": [
+      {
+        "kind": "text_to_video",
+        "model_id": "registry-video",
+        "defaults": {
+          "width": 832,
+          "height": 480,
+          "num_frames": 17,
+          "fps": 12,
+          "steps": 10,
+          "guidance_scale": 5
+        }
+      }
+    ]
+  }
+}

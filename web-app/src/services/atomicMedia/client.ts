@@ -8,20 +8,6 @@ import type {
 
 export const ATOMIC_MEDIA_BASE_URL = 'http://127.0.0.1:13420'
 
-export const ATOMIC_MEDIA_DEFAULT_VIDEO_REQUEST: Omit<
-  AtomicMediaJobRequest,
-  'prompt'
-> = {
-  kind: 'text_to_video',
-  device: 'auto',
-  width: 832,
-  height: 480,
-  num_frames: 17,
-  steps: 10,
-  fps: 12,
-  guidance_scale: 5,
-}
-
 export type AtomicMediaClientErrorCode =
   | 'network_error'
   | 'http_error'
