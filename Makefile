@@ -384,16 +384,40 @@ endif
 # fresh checkout has none of them and test-rust cannot compile until they exist.
 # Generate them from the tracked master when the platform's required icon is
 # missing, and never overwrite a real local build.
+#
+# `tauri icon` also REWRITES its own input: it emits a 512x512 icons/icon.png
+# over the tracked 1024x1024 master. That is how the master silently lost half
+# its resolution once already, sitting in the tree as an unexplained diff. So
+# copy the master aside and restore it afterwards - generating icons must never
+# degrade the source they are generated from. icon.png is not listed in
+# bundle.icon, so restoring it cannot affect any build.
+#
+# The rewrite was measured on Windows. The darwin path additionally runs
+# scripts/build-macos-app-icon.py and has not been verified here, but a build
+# step must not rewrite a tracked source on any platform.
 app-icons:
 ifeq ($(OS),Windows_NT)
 	powershell -NoProfile -Command "\
 		if (Test-Path 'src-tauri/icons/icon.ico') { exit 0 }; \
+		$$master = Join-Path $$env:TEMP 'atomic-icon-master.png'; \
+		Copy-Item 'src-tauri/icons/icon.png' $$master -Force; \
 		yarn build:icon; \
-		exit $$LASTEXITCODE"
+		$$rc = $$LASTEXITCODE; \
+		Copy-Item $$master 'src-tauri/icons/icon.png' -Force; \
+		Remove-Item $$master -Force; \
+		exit $$rc"
 else ifeq ($(shell uname -s),Darwin)
-	@[ -e src-tauri/icons/icon.icns ] || yarn build:icon
+	@[ -e src-tauri/icons/icon.icns ] || ( \
+		master=$$(mktemp); cp src-tauri/icons/icon.png "$$master"; \
+		yarn build:icon; rc=$$?; \
+		cp "$$master" src-tauri/icons/icon.png; rm -f "$$master"; \
+		exit $$rc )
 else
-	@[ -e src-tauri/icons/32x32.png ] || yarn build:icon
+	@[ -e src-tauri/icons/32x32.png ] || ( \
+		master=$$(mktemp); cp src-tauri/icons/icon.png "$$master"; \
+		yarn build:icon; rc=$$?; \
+		cp "$$master" src-tauri/icons/icon.png; rm -f "$$master"; \
+		exit $$rc )
 endif
 
 test-rust: export TAURI_CONFIG := {"bundle":{"icon":["icons/icon.png"]}}
