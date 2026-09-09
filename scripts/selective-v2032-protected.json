@@ -8,6 +8,6 @@
   "web-app/src/hooks/useAtomicMediaJob.ts": "29ab7f4cd909ba83037d9db288062fb41743808f04c84396cac4a2b4aed252d1",
   "web-app/src/routes/media.tsx": "997102f3082ee9756ddba73339f01c7a3c58bd7151e622481851104bb1f2ea92",
   "web-app/src/services/atomicMedia/client.test.ts": "e51009e8936cd5cab27d39bb379c2b51de56da1bf43ed84cb0f78cbe876ddac3",
-  "web-app/src/services/atomicMedia/client.ts": "06303c6464998b358b17376bd613e3d872898630e7ddeb0070c0435c46639340",
+  "web-app/src/services/atomicMedia/client.ts": "e632f9720703028f23c4fa502529f2157a15822498cb5fead412cf687cddc197",
   "web-app/src/services/atomicMedia/types.ts": "673f0774e43c18a262a5a1e316dd32d57fdabe3f2130ebb3758c36abc5d6c434"
 }
