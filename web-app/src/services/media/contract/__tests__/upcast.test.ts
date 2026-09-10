@@ -25,8 +25,20 @@ function paramIds(task: string): string[] {
   return (model().params[task] ?? []).map((spec) => spec.id)
 }
 
+/**
+ * One parameter spec, with `order` stripped.
+ *
+ * The shape assertions below are exact `toEqual` comparisons on purpose, so a
+ * silently-added field fails them. `order` is positional rather than part of a
+ * parameter's meaning, and pinning its index in nine separate shape tests would
+ * make every one of them break whenever a parameter is inserted above it. It
+ * has its own describe block instead - see "ordering within a group".
+ */
 function spec(task: string, id: string) {
-  return (model().params[task] ?? []).find((entry) => entry.id === id)
+  const found = (model().params[task] ?? []).find((entry) => entry.id === id)
+  if (!found) return undefined
+  const { order: _order, ...rest } = found
+  return rest
 }
 
 /**
@@ -487,5 +499,48 @@ describe('downcastV2Request', () => {
     expect(body.width).toBe(832)
     expect(warn.mock.calls).toEqual([])
     warn.mockRestore()
+  })
+
+})
+
+describe('ordering within a group', () => {
+  /**
+   * The upcaster emits each group's specs in a deliberate sequence, but until
+   * this was fixed it set no `order`, so every spec in a group tied and the
+   * renderer's final tiebreak - the parameter id, alphabetically - decided
+   * the layout. That put Guidance above Steps and FPS above Frames, which is
+   * backwards from both the emission order and the shipped form.
+   *
+   * Task 2 wrote the upcaster before Task 10 built the renderer, so there was
+   * nothing to order against at the time. There is now.
+   */
+  it('gives every spec an order so the renderer never falls back to the id', () => {
+    for (const task of ['text_to_video', 'image_to_video']) {
+      const specs = model().params[task] ?? []
+      expect(specs.length).toBeGreaterThan(0)
+      for (const spec of specs) {
+        expect(typeof spec.order).toBe('number')
+      }
+    }
+  })
+
+  it('orders each group by the sequence the upcaster emits, not alphabetically', () => {
+    const specs = model().params['text_to_video'] ?? []
+    const orderOf = (id: string) =>
+      specs.find((spec) => spec.id === id)?.order as number
+
+    // Both pairs sort the wrong way round under an alphabetical tiebreak:
+    // guidance_scale < steps, and fps < num_frames.
+    expect(orderOf('steps')).toBeLessThan(orderOf('guidance_scale'))
+    expect(orderOf('num_frames')).toBeLessThan(orderOf('fps'))
+    expect(orderOf('prompt')).toBeLessThan(orderOf('negative_prompt'))
+  })
+
+  it('keeps order ascending across every group so the sequence is total', () => {
+    const specs = model().params['image_to_video'] ?? []
+    const orders = specs.map((spec) => spec.order as number)
+
+    expect(orders).toEqual([...orders].sort((a, b) => a - b))
+    expect(new Set(orders).size).toBe(orders.length)
   })
 })

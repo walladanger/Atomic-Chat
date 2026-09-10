@@ -241,7 +241,16 @@ function paramsForTask(
     })
   }
 
-  return specs
+  // Stamp the emission sequence onto the specs.
+  //
+  // The renderer sorts by group, then `order`, then falls back to the
+  // parameter id. Leaving `order` unset makes every spec in a group tie, so
+  // that id fallback silently decides the layout: it put Guidance above Steps
+  // and FPS above Frames, both backwards from the sequence written above and
+  // from the form that ships today. The upcaster predates the renderer, which
+  // is why the field was never set; it is set here so the deliberate order
+  // above is the order a person sees.
+  return specs.map((spec, index) => ({ ...spec, order: index }))
 }
 
 function modelDescriptor(
