@@ -38,6 +38,7 @@ import type {
 
 import { MediaParamGroups } from './params/MediaParamGroup'
 import { useMediaParamState } from './params/useMediaParamState'
+import { useTranslation } from '@/i18n/react-i18next-compat'
 import { fieldClass, labelClass } from './params/paramIdentity'
 
 /** The one parameter drawn outside the grid. See D10. */
@@ -141,6 +142,7 @@ export function MediaGenerationForm({
     [specs]
   )
 
+  const { t } = useTranslation()
   const { values, setValue, blur } = useMediaParamState(specs, initialParams)
 
   // The model's required device wins, then the first one offered. v1 did
@@ -187,7 +189,7 @@ export function MediaGenerationForm({
       <div className="rounded-xl border border-border/60 bg-background p-4 shadow-sm">
         <div
           role="tablist"
-          aria-label="Generation task"
+          aria-label={t('media:form.task', { defaultValue: 'Generation task' })}
           className="mb-4 flex items-center gap-1 rounded-lg bg-muted/70 p-1"
         >
           {orderedTasks.map((entry) => (
@@ -226,7 +228,7 @@ export function MediaGenerationForm({
               </label>
               <select
                 id="media-provider"
-                aria-label="Provider"
+                aria-label={t('media:form.provider', { defaultValue: 'Provider' })}
                 className={fieldClass}
                 value={activeProviderId}
                 onChange={(event) => handleProviderChange(event.target.value)}
@@ -246,7 +248,7 @@ export function MediaGenerationForm({
               </label>
               <select
                 id="media-model"
-                aria-label="Model"
+                aria-label={t('media:form.model', { defaultValue: 'Model' })}
                 className={fieldClass}
                 value={shownModelId}
                 onChange={(event) => onSelectModel(event.target.value)}
@@ -267,7 +269,7 @@ export function MediaGenerationForm({
                 </label>
                 <select
                   id="media-device"
-                  aria-label="Device"
+                  aria-label={t('media:form.device', { defaultValue: 'Device' })}
                   className={fieldClass}
                   value={device}
                   onChange={(event) => setDevice(event.target.value)}
@@ -301,7 +303,7 @@ export function MediaGenerationForm({
         </label>
         <textarea
           id="media-prompt"
-          aria-label="Prompt"
+          aria-label={t('media:form.prompt', { defaultValue: 'Prompt' })}
           className="min-h-24 w-full resize-none bg-transparent px-1 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground"
           placeholder="Describe what you want to create..."
           value={prompt}
@@ -311,8 +313,13 @@ export function MediaGenerationForm({
         <div className="mt-2 flex items-center justify-between gap-3">
           <div className="text-xs text-muted-foreground">
             {activeModel
-              ? `Generating with ${activeModel.label}`
-              : 'Select a model to begin'}
+              ? t('media:form.generatingWith', {
+                  model: activeModel.label,
+                  defaultValue: 'Generating with {{model}}',
+                })
+              : t('media:form.selectModel', {
+                  defaultValue: 'Select a model to begin',
+                })}
           </div>
           <button
             type="button"

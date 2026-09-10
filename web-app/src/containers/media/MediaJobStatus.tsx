@@ -15,6 +15,7 @@
  */
 import { cn } from '@/lib/utils'
 import { isTerminalMediaJobState } from '@/services/media/jobManager'
+import { useTranslation } from '@/i18n/react-i18next-compat'
 import type {
   MediaJobSnapshot,
   MediaProviderDescriptor,
@@ -39,14 +40,31 @@ function dotClass(state: MediaProviderHealth['state'] | undefined): string {
   return 'bg-red-500'
 }
 
-function healthText(health: MediaProviderHealth | undefined): string {
-  if (!health) return 'Not checked'
+type Translate = (key: string, options?: Record<string, unknown>) => string
+
+function healthText(
+  health: MediaProviderHealth | undefined,
+  t: Translate
+): string {
+  if (!health) return t('media:status.notChecked', { defaultValue: 'Not checked' })
   if (health.state === 'online') {
-    return health.version ? `Online · v${health.version}` : 'Online'
+    return health.version
+      ? t('media:status.onlineVersion', {
+          version: health.version,
+          defaultValue: 'Online · v{{version}}',
+        })
+      : t('media:status.online', { defaultValue: 'Online' })
   }
-  if (health.state === 'checking') return 'Checking…'
-  if (health.state === 'unauthorised') return 'Needs a key'
-  return health.detail ? `Offline · ${health.detail}` : 'Offline'
+  if (health.state === 'checking')
+    return t('media:status.checking', { defaultValue: 'Checking…' })
+  if (health.state === 'unauthorised')
+    return t('media:status.needsKey', { defaultValue: 'Needs a key' })
+  return health.detail
+    ? t('media:status.offlineDetail', {
+        detail: health.detail,
+        defaultValue: 'Offline · {{detail}}',
+      })
+    : t('media:status.offline', { defaultValue: 'Offline' })
 }
 
 export function MediaJobStatus({
@@ -58,12 +76,15 @@ export function MediaJobStatus({
   errors,
   onRetryProvider,
 }: MediaJobStatusProps) {
+  const { t } = useTranslation()
   const progress = Math.max(0, Math.min(100, Number(job?.progress ?? 0)))
   const running = job ? !isTerminalMediaJobState(job.state) : false
 
   return (
     <div className="rounded-xl border border-border/60 bg-background p-4 shadow-sm">
-      <p className="text-xs font-semibold text-foreground">Providers</p>
+      <p className="text-xs font-semibold text-foreground">
+        {t('media:status.providers', { defaultValue: 'Providers' })}
+      </p>
 
       <ul className="mt-2 flex flex-col gap-1.5">
         {providers.map((provider) => {
@@ -82,7 +103,7 @@ export function MediaJobStatus({
                 <span className="font-medium text-foreground">
                   {provider.label}
                 </span>
-                <span>{healthText(entry)}</span>
+                <span>{healthText(entry, t)}</span>
               </span>
 
               {offline && (

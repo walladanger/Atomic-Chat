@@ -18,6 +18,7 @@ import { MediaJobStatus } from './MediaJobStatus'
 import { MediaPreview } from './MediaPreview'
 import { useMediaGeneration } from '@/hooks/useMediaGeneration'
 import { useMediaJobAsset } from '@/hooks/useMediaJobAsset'
+import { useTranslation } from '@/i18n/react-i18next-compat'
 import { useMediaProviderStore } from '@/stores/media-provider-store'
 import { isTerminalMediaJobState } from '@/services/media/jobManager'
 import {
@@ -42,6 +43,7 @@ export type MediaStudioProps = {
 }
 
 export function MediaStudio({ libraryLink }: MediaStudioProps = {}) {
+  const { t } = useTranslation()
   const providers = useMediaProviderStore((state) => state.providers)
   const capabilities = useMediaProviderStore((state) => state.capabilities)
   const health = useMediaProviderStore((state) => state.health)
@@ -152,7 +154,7 @@ export function MediaStudio({ libraryLink }: MediaStudioProps = {}) {
     ? selectedModel
       ? `${selectedModel.label} · ${selectedProvider.label}`
       : selectedProvider.label
-    : 'No media provider'
+    : t('media:studio.noProvider', { defaultValue: 'No media provider' })
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col bg-neutral-50 dark:bg-background">
@@ -160,10 +162,10 @@ export function MediaStudio({ libraryLink }: MediaStudioProps = {}) {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-              Radium Media
+              {t('media:studio.brand', { defaultValue: 'Radium Media' })}
             </p>
             <h1 className="mt-0.5 font-studio text-xl font-medium text-foreground">
-              Media Studio
+              {t('media:studio.title', { defaultValue: 'Media Studio' })}
             </h1>
             {libraryLink && (
               <div className="mt-1 text-xs text-muted-foreground">

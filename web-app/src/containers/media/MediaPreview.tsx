@@ -18,6 +18,7 @@
  */
 import { convertFileSrc } from '@tauri-apps/api/core'
 
+import { useTranslation } from '@/i18n/react-i18next-compat'
 import type { MediaAsset } from '@/services/media/assets'
 
 const frameClass =
@@ -40,6 +41,7 @@ type MediaPreviewProps = {
 }
 
 export function MediaPreview({ asset }: MediaPreviewProps) {
+  const { t } = useTranslation()
   if (!asset) {
     return (
       <div className={frameClass}>
@@ -48,11 +50,13 @@ export function MediaPreview({ asset }: MediaPreviewProps) {
             ✦
           </div>
           <p className="text-sm font-medium text-foreground">
-            Generation preview
+            {t('media:preview.title', { defaultValue: 'Generation preview' })}
           </p>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            Your finished image or video will appear here without leaving Radium
-            Chat.
+            {t('media:preview.description', {
+              defaultValue:
+                'Your finished image or video will appear here without leaving Radium Chat.',
+            })}
           </p>
         </div>
       </div>
@@ -68,7 +72,7 @@ export function MediaPreview({ asset }: MediaPreviewProps) {
           data-testid="media-image-preview"
           className="max-h-[58vh] w-full object-contain"
           src={src}
-          alt="Generated media"
+          alt={t('media:preview.alt', { defaultValue: 'Generated media' })}
         />
       )}
 

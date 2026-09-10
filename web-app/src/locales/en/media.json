@@ -66,5 +66,34 @@
   },
   "settings": {
     "title": "Media"
+  },
+  "studio": {
+    "brand": "Radium Media",
+    "title": "Media Studio",
+    "noProvider": "No media provider"
+  },
+  "status": {
+    "providers": "Providers",
+    "notChecked": "Not checked",
+    "online": "Online",
+    "onlineVersion": "Online · v{{version}}",
+    "needsKey": "Needs a key",
+    "offline": "Offline",
+    "offlineDetail": "Offline · {{detail}}",
+    "checking": "Checking…"
+  },
+  "preview": {
+    "title": "Generation preview",
+    "description": "Your finished image or video will appear here without leaving Radium Chat.",
+    "alt": "Generated media"
+  },
+  "form": {
+    "task": "Generation task",
+    "provider": "Provider",
+    "model": "Model",
+    "device": "Device",
+    "prompt": "Prompt",
+    "generatingWith": "Generating with {{model}}",
+    "selectModel": "Select a model to begin"
   }
 }
