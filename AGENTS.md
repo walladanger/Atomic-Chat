@@ -34,6 +34,7 @@ much of the tree still carries `jan*` / `@janhq/*` names — see §4.
 | ----------------------------------------- | ------------------------------------------------------------------------------------ |
 | `web-app/`                                | Frontend: React + Vite + TanStack Router, Tailwind, shadcn. Workspace `@janhq/web-app`. |
 | `web-app/src/routes/launch/`              | "Launch" page — install/configure external coding agents against the local API. Catalog: `web-app/src/constants/integrations.ts`; commands: `src-tauri/src/core/system/commands.rs`. |
+| `web-app/src/services/media/`              | Radium Media platform: the v2 contract, provider adapters, the job manager and the on-disk library. Providers are a list, not a hardcoded worker - see the ADRs under "Radium Media platform" in `docs/decisions/INDEX.md`. |
 | `core/`                                   | Shared TS core: types, browser runtime, extension contracts. Built + `yarn pack`'d, consumed by extensions. |
 | `extensions/`                             | Pluggable backend extensions (TS, rolldown-bundled). Each has `src/`, `package.json`, `settings.json`. |
 | `extensions/llamacpp-extension/`          | Driver for our `atomic-llama-cpp-turboquant` fork. All desktop platforms.             |
@@ -170,8 +171,9 @@ defaults on conflict.
    or migration). Same session, before you finish. See §7.
 9. **Touching Radium Media?** Open the tracker linked at the top of this file
    *before* writing anything, work the first row that is not Done, and update
-   its Status in the same commit. Task 0 is a hard gate — `make verify` is red
-   until it lands, and decision Q1 is the user's call, not yours. Starting cold?
+   its Status in the same commit. Open decisions on its Decisions sheet are the
+   user's call, never yours; changing a guard-protected file needs their
+   authorisation and its own isolated re-baseline commit. Starting cold?
    Use [the kickoff prompt](docs/superpowers/plans/2026-09-08-media-platform-agent-prompt.md).
 
 ---

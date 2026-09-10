@@ -72,6 +72,7 @@ Dev (`make dev-windows-cpu` / `yarn dev`) and the installed `Atomic Chat.exe` **
 | `%APPDATA%\Atomic Chat\data\models\` | Downloaded GGUF / MLX models | factory reset (UI), `make clean-windows-all`, uninstaller |
 | `%APPDATA%\Atomic Chat\data\threads\` | Chat history | factory reset, `make clean-windows-all`, uninstaller |
 | `%APPDATA%\Atomic Chat\data\extensions\` | Installed extensions (`@janhq/*`, `llamacpp-extension`, …) | factory reset, `make clean-windows-all`, uninstaller |
+| `%APPDATA%\Atomic Chat\data\media\` | Radium Media output: generated images and video under `outputs\`, thumbnails under `thumbs\`, and `index.json` - the only durable record that a generation happened, including its provenance (provider, model, parameters, resolved seed). Deleting an asset in the library removes the file as well as the index entry. Files a provider wrote elsewhere are *adopted in place* and therefore live outside this folder. | factory reset, `make clean-windows-all`, uninstaller |
 | `%APPDATA%\Atomic Chat\data\logs\app.log` | Application logs (`tauri_plugin_log`) | factory reset, `make clean-windows-all`, uninstaller |
 | `%APPDATA%\Atomic Chat\data\store.json` | Migration / version store | factory reset, `make clean-windows-all`, uninstaller |
 | `%APPDATA%\Atomic Chat\data\mcp_config.json` | MCP servers config | factory reset, `make clean-windows-all`, uninstaller |
@@ -91,6 +92,16 @@ Dev (`make dev-windows-cpu` / `yarn dev`) and the installed `Atomic Chat.exe` **
 | Full wipe (all data, settings, WebView2 cache) — true first-launch | `make clean-windows-all CONFIRM=1` |
 | In-app reset (keeps downloaded backends and the active backend selection) | `Settings → General → Reset to Factory Default` |
 | End-user uninstall + delete data | Uninstaller → enable **Delete app data** checkbox |
+
+### Media provider credentials are NOT in the data folder
+
+API keys for cloud media providers live in the **operating system credential
+store** - Windows Credential Manager, under the service `Radium Chat - Media` -
+not in `settings.json`, not in `localStorage`, and not under `data\`. Nothing in
+the table above clears them: factory reset, `make clean-windows-all` and the
+uninstaller all leave them untouched. Remove one from `Settings -> Media` (delete
+the provider), or from Windows' own Credential Manager. See ADR
+`docs/decisions/2026-09-10-store-media-provider-credentials-in-the-os-credential-store.md`.
 
 ### Custom data folder
 

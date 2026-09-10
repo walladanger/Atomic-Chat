@@ -9,7 +9,9 @@ decision is reversed, add a new one that says which record it supersedes.
 2. Add one line to the right section of this index.
 3. Do **not** paste the record body into `AGENTS.md`.
 
-215 records, 2026-05-19 → 2026-08-21.
+224 records, 2026-05-19 → 2026-09-10.
+
+<!-- The count was 215 before the eight Radium Media records of 2026-09-10, but there were 216 files: a pre-existing off-by-one, corrected here rather than carried forward. Verified by counting *.md excluding INDEX and _TEMPLATE. -->
 
 ---
 
@@ -32,6 +34,20 @@ decision is reversed, add a new one that says which record it supersedes.
 - **2026-06-09** — [Default the macOS local llama.cpp engine to `llamacpp-upstream` so the Recommended Gemma 4 vision model loads out of the box (ATO-116)](2026-06-09-default-the-macos-local-llama-cpp-engine-to-llamacpp-upstream.md)
 
 ---
+
+## Radium Media platform (8)
+
+The model-agnostic media platform: provider adapters, the v2 contract, the
+library on disk, and how the frozen surface is allowed to change.
+
+- **2026-09-10** — [Adopt a provider-adapter architecture for Radium Media](2026-09-10-adopt-a-provider-adapter-architecture-for-radium-media.md)
+- **2026-09-10** — [Media contract v2 uses declarative parameter schemas with an open task vocabulary](2026-09-10-media-contract-v2-uses-declarative-parameter-schemas.md)
+- **2026-09-10** — [Materialise every media output to local disk before preview](2026-09-10-materialise-every-media-output-to-disk-before-preview.md)
+- **2026-09-10** — [The media library lives at `<data_folder>/media/` with provenance records](2026-09-10-the-media-library-lives-under-the-data-folder-with-provenance.md)
+- **2026-09-10** — [Re-baselining the selective-v2.0.32 protected manifest is an isolated, single-purpose commit](2026-09-10-re-baselining-the-protected-manifest-is-an-isolated-commit.md)
+- **2026-09-10** — [Cloud media providers are in scope, behind one remote HTTP adapter](2026-09-10-cloud-media-providers-are-in-scope-behind-one-remote-adapter.md)
+- **2026-09-10** — [Store media provider credentials in the OS credential store, never in localStorage](2026-09-10-store-media-provider-credentials-in-the-os-credential-store.md)
+- **2026-09-10** — [Media models and providers come from `atomic-chat-conf`](2026-09-10-media-models-and-providers-come-from-atomic-chat-conf.md) — decision only; Task 15 deferred
 
 ## Launch page & external coding agents (16)
 
