@@ -17,6 +17,7 @@ export {
 
 export {
   validateParams,
+  visibleParams,
   type MediaParamDependency,
   type MediaParamModulus,
   type MediaParamOption,

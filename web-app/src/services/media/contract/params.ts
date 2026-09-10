@@ -317,11 +317,30 @@ function clauseHolds(clause: MediaParamDependency, effective: unknown): boolean 
  *   reported as missing, even when `required`.
  * - An absent or empty `seed` is omitted so the provider randomises.
  */
-export function validateParams(
+/**
+ * Which specs are currently visible, given the values entered so far.
+ *
+ * Exported because a renderer has to decide what to draw and `validateParams`
+ * has to decide what to submit, and those two answers must never disagree. A
+ * second implementation of `depends_on` in the UI would drift from this one the
+ * first time either changed.
+ */
+export function visibleParams(
   specs: MediaParamSpec[],
   values: Record<string, unknown>
-): MediaParamValidationResult {
+): MediaParamSpec[] {
   const safeSpecs = Array.isArray(specs) ? specs : []
+  const { isVisible } = resolveVisibility(safeSpecs, values)
+  return safeSpecs.filter(
+    (spec) => spec && typeof spec.id === 'string' && isVisible(spec)
+  )
+}
+
+/** Coerce every spec, then resolve `depends_on` against the typed results. */
+function resolveVisibility(
+  safeSpecs: MediaParamSpec[],
+  values: Record<string, unknown>
+) {
   const safeValues =
     values && typeof values === 'object' ? values : ({} as Record<string, unknown>)
 
@@ -377,6 +396,16 @@ export function validateParams(
     visibility.set(spec.id, visible)
     return visible
   }
+
+  return { byId, coerced, isVisible }
+}
+
+export function validateParams(
+  specs: MediaParamSpec[],
+  values: Record<string, unknown>
+): MediaParamValidationResult {
+  const safeSpecs = Array.isArray(specs) ? specs : []
+  const { coerced, isVisible } = resolveVisibility(safeSpecs, values)
 
   const output: Record<string, unknown> = {}
   const errors: MediaParamValidationError[] = []
