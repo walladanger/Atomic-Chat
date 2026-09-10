@@ -1,10 +1,38 @@
 import { Assistant, AssistantExtension, fs, joinPath } from '@janhq/core'
+
+/** The product name before the 2026-09-10 rebrand, and after it. */
+const FORMER_PRODUCT_NAME = 'Atomic Chat'
+const PRODUCT_NAME = 'Radium Chat'
+
+/**
+ * Rewrite the product name inside an assistant's instructions.
+ *
+ * Deliberately a TARGETED substitution, unlike migrations v1 and v2 which
+ * replaced the whole instruction field. By now a user may have edited their
+ * assistant's instructions, and overwriting the field wholesale would discard
+ * that silently. Only the brand name changes; every other character is left
+ * exactly as it was found.
+ *
+ * Returns a value-equal string when there is nothing to rename, so the caller's
+ * `===` check skips the file write entirely. The early return is for clarity
+ * rather than correctness - split/join on a string with no match already
+ * returns an equal value, and JS compares primitive strings by value.
+ */
+export function renameProductInInstructions(
+  instructions: string | undefined
+): string | undefined {
+  if (!instructions || !instructions.includes(FORMER_PRODUCT_NAME)) {
+    return instructions
+  }
+  return instructions.split(FORMER_PRODUCT_NAME).join(PRODUCT_NAME)
+}
+
 /**
  * JanAssistantExtension is an AssistantExtension implementation that provides
  * functionality for managing assistants.
  */
 export default class JanAssistantExtension extends AssistantExtension {
-  private readonly CURRENT_MIGRATION_VERSION = 2
+  private readonly CURRENT_MIGRATION_VERSION = 3
   private readonly MIGRATION_FILE = 'file://assistants/.migration_version'
 
   /**
@@ -79,6 +107,12 @@ export default class JanAssistantExtension extends AssistantExtension {
       await this.saveMigrationVersion(2)
     }
 
+    if (currentVersion < 3) {
+      console.log(`Running migration v3: rename the product to ${PRODUCT_NAME}`)
+      await this.migrateProductName()
+      await this.saveMigrationVersion(3)
+    }
+
     console.log(
       `Migrations complete. Current version: ${this.CURRENT_MIGRATION_VERSION}`
     )
@@ -122,6 +156,45 @@ export default class JanAssistantExtension extends AssistantExtension {
         } catch (error) {
           console.error(`Failed to migrate assistant ${assistant.id}:`, error)
         }
+      }
+    }
+  }
+
+  /**
+   * Migration v3: the product was renamed from "Atomic Chat" to "Radium Chat".
+   *
+   * Migrations v1 and v2 rewrote the whole instruction field, which was safe
+   * when the text was still the shipped default. It is not safe now, so this
+   * one substitutes only the brand name and leaves any customisation intact.
+   *
+   * An assistant whose instructions never mentioned the old name is skipped
+   * without a write, so a user who replaced the default entirely is untouched.
+   */
+  private async migrateProductName(): Promise<void> {
+    if (!(await fs.existsSync('file://assistants'))) {
+      return
+    }
+
+    for (const assistant of await this.getAssistants()) {
+      const instructions = renameProductInInstructions(assistant.instructions)
+      if (instructions === assistant.instructions) continue
+
+      const assistantPath = await joinPath([
+        'file://assistants',
+        assistant.id,
+        'assistant.json',
+      ])
+
+      try {
+        await fs.writeFileSync(
+          assistantPath,
+          JSON.stringify({ ...assistant, instructions }, null, 2)
+        )
+        console.log(`Renamed the product for assistant: ${assistant.id}`)
+      } catch (error) {
+        // Non-fatal by design: a wording change must never stop the extension
+        // loading, and the migration version is only saved once the sweep ends.
+        console.error(`Failed to rename for assistant ${assistant.id}:`, error)
       }
     }
   }
