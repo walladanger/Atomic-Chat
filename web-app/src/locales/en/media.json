@@ -29,7 +29,8 @@
       "openai-images": "OpenAI-compatible images",
       "custom-http": "Custom HTTP"
     },
-    "modelCount": "Models: {{count}}"
+    "modelCount": "Models: {{count}}",
+    "checkForNew": "Check for new providers"
   },
   "models": {
     "cardTitle": "{{provider}} models",

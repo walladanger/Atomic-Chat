@@ -606,3 +606,76 @@ cache / baseline / version mismatch / malformed). The search test pins
 the ranking properties (popularity beats downloads-only, MLX queries
 prefer mlx-community on macOS, janhq is suppressed by ORG_BOOST). The
 shim test covers compatibility with the legacy `useModelSources` API.
+
+---
+
+# 3. Media Registry
+
+> **Scope**: [media-registry.ts](./media-registry.ts) — the network loader —
+> and [../stores/media-provider-store.ts](../stores/media-provider-store.ts).
+
+A structural clone of §1, published from the same repo
+[`AtomicBot-ai/atomic-chat-conf`](https://github.com/AtomicBot-ai/atomic-chat-conf),
+at `media/registry.json`. Cache keys `atomic_media_registry_cache_v1` /
+`..._ts_v1`, TTL one hour, `clearMediaRegistryCache()` to drop it.
+
+`getMediaProvidersOrFallback()` is documented as **never throwing** — UI code
+must not wrap it in `try/catch` for control flow.
+
+## Failure modes (and what to render)
+
+| Trigger                                | Source returned | UI behavior                                                   |
+| -------------------------------------- | --------------- | ------------------------------------------------------------- |
+| Fresh cache present, no force          | `cache`         | Silent — same providers shown.                                |
+| Fetch succeeds                         | `remote`        | Silent. Cache and store are updated.                          |
+| Fetch fails, stale cache exists        | `cache`         | Silent. `error` is set so an explicit Refresh can show a toast.|
+| Fetch fails, no cache                  | `baseline`      | Silent. The bundled local worker only.                        |
+| `schema_version` exceeds support       | `baseline`      | Silent. Payload refused ENTIRELY, not partially read.         |
+| Manifest payload malformed             | `baseline`      | Silent. Logged via `console.warn`.                            |
+| Tauri fetch unavailable (web/test env) | uses `globalThis.fetch` | Same outcomes as above.                               |
+
+## Why this one is stricter than §1
+
+The provider registry can add a **model**. This one can add a **provider**,
+which means it can add a URL the app will send prompts to. Every entry is
+therefore *dropped* rather than repaired, and three fields are overwritten
+whatever the payload says:
+
+| Field | Forced to | Why |
+|---|---|---|
+| `origin` | `registry` | An entry claiming `builtin` would make itself undeletable. |
+| `auth.setting_key` | `media.<its own id>.api_key` | A remote party must never choose which credential the app reads. |
+| `enabled` | `false` | Adding a provider is the user's act; the registry only offers one. |
+
+Also rejected outright: an unknown `adapter`, a `base_url` that is not
+`http(s)`, and any descriptor missing `id` or `adapter`. A bundled baseline
+provider always wins over a remote entry with the same id, so the local worker
+cannot be redirected by a registry commit.
+
+`refreshRegistry()` on the store **only ever adds**. A provider the user already
+has — including one they disabled or re-pointed — is left exactly as it is.
+
+## Schema
+
+```json
+{
+  "schema_version": 1,
+  "updated_at": "2026-09-10T00:00:00Z",
+  "providers": [
+    {
+      "id": "hosted-images",
+      "label": "Hosted Images",
+      "kind": "remote_http",
+      "adapter": "openai-images",
+      "base_url": "https://api.example.com/v1",
+      "auth": { "type": "api_key" },
+      "order": 10
+    }
+  ]
+}
+```
+
+`adapter` must be one of `atomic-media-worker`, `comfyui`, `openai-images`,
+`custom-http`. `auth.setting_key` is ignored if present. **The companion PR
+against `atomic-chat-conf` has not been opened** — that is a second repository
+and outside this plan's gate.

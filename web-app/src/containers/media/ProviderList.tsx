@@ -108,6 +108,12 @@ export function ProviderList() {
     (state) => state.setProviderEnabled
   )
   const refresh = useMediaProviderStore((state) => state.refresh)
+  const refreshRegistry = useMediaProviderStore(
+    (state) => state.refreshRegistry
+  )
+  const registryLoading = useMediaProviderStore(
+    (state) => state.registryLoading
+  )
 
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
@@ -224,6 +230,16 @@ export function ProviderList() {
               disabled={refreshing}
             >
               {t('media:providers.refresh', { defaultValue: 'Refresh' })}
+            </Button>
+            <Button
+              variant="link"
+              size="sm"
+              onClick={() => void refreshRegistry(true)}
+              disabled={registryLoading}
+            >
+              {t('media:providers.checkForNew', {
+                defaultValue: 'Check for new providers',
+              })}
             </Button>
             <Button size="sm" onClick={() => setAdding(true)}>
               {t('media:providers.add', { defaultValue: 'Add provider' })}

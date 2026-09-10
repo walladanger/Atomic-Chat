@@ -24,6 +24,7 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { localStorageKey } from '@/constants/localStorage'
 import { BASELINE_MEDIA_PROVIDERS } from '@/constants/mediaProviders'
 import { createMediaAdapter } from '@/services/media/providerFactory'
+import { getMediaProvidersOrFallback } from '@/services/media-registry'
 import type {
   MediaCapabilities,
   MediaModelDescriptor,
@@ -49,11 +50,24 @@ type MediaProviderState = {
   selectedModelId: string | null
   refreshing: boolean
 
+  /** Last remote-registry outcome. Never persisted; re-derived per launch. */
+  registrySource: 'remote' | 'cache' | 'baseline' | null
+  registryError: string | null
+  registryLoading: boolean
+
   addProvider: (descriptor: MediaProviderDescriptor) => void
   removeProvider: (id: string) => void
   setProviderEnabled: (id: string, enabled: boolean) => void
   setSelectedModel: (modelId: string | null) => void
   refresh: (options?: MediaRefreshOptions) => Promise<void>
+  /**
+   * Pull the remote media registry and ADD anything new.
+   *
+   * Only ever adds. A provider the user already has - including one they
+   * disabled or edited - is left exactly as it is, because their configuration
+   * is theirs and a registry commit must not overwrite it.
+   */
+  refreshRegistry: (force?: boolean) => Promise<void>
   /** Models from every enabled provider, merged. Ids are provider-qualified. */
   models: () => MediaModelDescriptor[]
 }
@@ -102,6 +116,9 @@ export const useMediaProviderStore = create<MediaProviderState>()(
       errors: {},
       selectedModelId: null,
       refreshing: false,
+      registrySource: null,
+      registryError: null,
+      registryLoading: false,
 
       addProvider: (descriptor) =>
         set((state) => {
@@ -152,6 +169,29 @@ export const useMediaProviderStore = create<MediaProviderState>()(
         return providers
           .filter((provider) => provider.enabled)
           .flatMap((provider) => capabilities[provider.id]?.models ?? [])
+      },
+
+      refreshRegistry: async (force = false) => {
+        set({ registryLoading: true })
+        // Documented as never throwing, so there is no try/catch here for
+        // control flow - only the state write.
+        const result = await getMediaProvidersOrFallback({ force })
+
+        set((state) => {
+          const known = new Set(state.providers.map((provider) => provider.id))
+          const added = result.providers.filter(
+            (provider) => !known.has(provider.id)
+          )
+
+          return {
+            providers: added.length
+              ? [...state.providers, ...added.map((p) => ({ ...p }))]
+              : state.providers,
+            registrySource: result.source,
+            registryError: result.error ?? null,
+            registryLoading: false,
+          }
+        })
       },
 
       refresh: async (options) => {

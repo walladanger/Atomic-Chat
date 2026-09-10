@@ -36,6 +36,7 @@ import type {
   MediaTaskPresentation,
 } from '@/services/media/contract'
 import { getMediaProviderSecret } from '@/services/media/secrets'
+import { clearMediaRegistryCache } from '@/services/media-registry'
 import { useMediaProviderStore } from '@/stores/media-provider-store'
 
 // The default translation context returns the raw KEY and ignores
@@ -188,6 +189,9 @@ beforeEach(() => {
   mockAdapters.clear()
   mockSecrets.clear()
   localStorage.clear()
+  // The registry caches into localStorage, so one test's payload would
+  // otherwise still be fresh for the next.
+  clearMediaRegistryCache()
   seedStore([])
 })
 
@@ -402,5 +406,93 @@ describe('provider secrets', () => {
     expect(await getMediaProviderSecret('cloud-images')).toBe(
       'sk-super-secret-value'
     )
+  })
+})
+
+/**
+ * Task 15 Step 5 - the registry Refresh button.
+ *
+ * The promise being pinned is the one that protects the user's own work: the
+ * registry only ever ADDS. A provider they already have - including one they
+ * disabled or pointed somewhere else - must survive a registry refresh
+ * untouched, because their configuration is theirs and a commit in another
+ * repository must not be able to overwrite it.
+ */
+/** A registry payload offering one hosted provider. */
+function stubRegistry(overrides: Record<string, unknown> = {}) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      json: async () => ({
+        schema_version: 1,
+        updated_at: '2026-09-10T00:00:00Z',
+        providers: [
+          {
+            id: 'hosted-images',
+            label: 'Hosted Images',
+            kind: 'remote_http',
+            adapter: 'openai-images',
+            base_url: 'https://api.example.com/v1',
+            ...overrides,
+          },
+        ],
+      }),
+    })) as unknown as typeof fetch
+  )
+}
+
+describe('the remote registry', () => {
+  it('adds providers the user does not have yet', async () => {
+    seedStore([providerFor('bundled', 'Radium Media Worker')])
+    stubAdapter('bundled')
+    stubAdapter('hosted-images')
+    stubRegistry()
+
+    render(<ProviderList />)
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Check for new providers' })
+    )
+
+    expect(await screen.findByText('Hosted Images')).toBeInTheDocument()
+  })
+
+  it('never overwrites a provider the user already configured', async () => {
+    // The user disabled it and pointed it somewhere of their own.
+    seedStore([
+      providerFor('hosted-images', 'My Own Name', {
+        base_url: 'http://127.0.0.1:9999',
+        enabled: false,
+        origin: 'user',
+      }),
+    ])
+    stubAdapter('hosted-images')
+    // The registry really does offer an entry with the same id, so this test
+    // exercises the collision rather than passing because nothing came back.
+    stubRegistry({ label: 'Registry Name', base_url: 'https://vendor.example' })
+
+    render(<ProviderList />)
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Check for new providers' })
+    )
+
+    await waitFor(() => {
+      expect(
+        useMediaProviderStore.getState().registryLoading
+      ).toBe(false)
+    })
+
+    const kept = useMediaProviderStore
+      .getState()
+      .providers.filter((provider) => provider.id === 'hosted-images')
+
+    expect(kept).toHaveLength(1)
+    expect(kept[0]!.label).toBe('My Own Name')
+    expect(kept[0]!.base_url).toBe('http://127.0.0.1:9999')
+    expect(kept[0]!.enabled).toBe(false)
   })
 })
