@@ -22,7 +22,7 @@ title: "Bundle every upstream Windows DLL, repair incomplete installs, and isola
  recursive bundled-backend completeness check in
  `tauri-plugin-llamacpp-upstream`. When an installed backend has the expected
  executable/version but lacks any bundled file, copy the bundled `build/`
- tree over it in place. Store backend-type preferences under separate Atomic
+ tree over it in place. Store backend-type preferences under separate Radium
  Chat keys for TurboQuant and upstream. On first read, migrate the legacy
  shared value only when its id shape belongs to that provider; leave the
  legacy key untouched so both extensions can independently inspect it.

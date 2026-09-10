@@ -11,7 +11,7 @@ title: "Auto-install Node.js/npm via `winget` when an npm-based Launch-page agen
  (`agent_install_spec` → `prereq`: `npm` for Claude Code / Codex / OpenCode /
  OpenClaw / Cline / MiMo / Pi / Kilo, `curl` for Goose/Hermes, etc.). When
  the prereq was missing it returned an actionable-but-manual error
- ("Install Node.js from https://nodejs.org, then restart Atomic Chat"). So a
+ ("Install Node.js from https://nodejs.org, then restart Radium Chat"). So a
  fresh Windows machine with no Node couldn't one-click-install any npm-based
  agent — the user had to leave the app, install Node, restart, and retry.
 - **Decision (per the user-chosen options — `winget`, **Windows-only**,

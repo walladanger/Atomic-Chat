@@ -5,7 +5,7 @@ title: "Isolate the first autonomous agent loop in the Rust backend"
 
 # 2026-07-16 — Isolate the first autonomous agent loop in the Rust backend
 
-- **Context:** Atomic Chat needs a grammar-constrained autonomous mode without
+- **Context:** Radium Chat needs a grammar-constrained autonomous mode without
   coupling its execution loop to the regular web chat or Vercel AI SDK path.
 - **Decision:** Add an isolated `core::agent` Rust module that talks directly
   to the active local llama.cpp session over `/completion`, uses a static

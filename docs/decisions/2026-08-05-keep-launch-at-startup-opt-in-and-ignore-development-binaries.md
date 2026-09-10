@@ -7,7 +7,7 @@ title: "Keep launch at startup opt-in and ignore development binaries"
 
 - **Context:** The one-time startup seed introduced on 2026-06-10 enabled OS
   autostart without consent. Clearing local storage caused it to run again,
-  overriding users who had disabled Atomic Chat through Windows, while Tauri
+  overriding users who had disabled Radium Chat through Windows, while Tauri
   development builds could register their temporary executable paths as login
   items.
 - **Decision:** Remove the automatic seed and restore the original opt-in

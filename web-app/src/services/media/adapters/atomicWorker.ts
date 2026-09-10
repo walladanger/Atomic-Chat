@@ -1,5 +1,5 @@
 /**
- * The Atomic Media Worker adapter.
+ * The Radium Media Worker adapter.
  *
  * This is where `@/services/atomicMedia` stops being an app-wide dependency and
  * becomes one provider's private implementation detail. Everything above this
@@ -176,7 +176,7 @@ export function createAtomicWorkerAdapter(
         throw new AtomicMediaClientError(
           `Provider "${descriptor.label}" speaks media contract v${version}; ` +
             `this build understands up to v${MEDIA_CONTRACT_MAX_SUPPORTED}. ` +
-            'A newer Atomic Chat is needed.',
+            'A newer Radium Chat is needed.',
           'invalid_response',
           { details: { contract_version: version } }
         )
@@ -216,7 +216,7 @@ export function createAtomicWorkerAdapter(
         handle.provider_job_id ?? providerJobIds.get(handle.client_job_id)
       if (!providerJobId) {
         throw new AtomicMediaClientError(
-          `No Atomic Media Worker job is known for client job "${handle.client_job_id}".`,
+          `No Radium Media Worker job is known for client job "${handle.client_job_id}".`,
           'invalid_response'
         )
       }

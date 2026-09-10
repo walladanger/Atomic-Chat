@@ -1,8 +1,8 @@
-# Contributing to Atomic Chat Core
+# Contributing to Radium Chat Core
 
 [← Back to Main Contributing Guide](../CONTRIBUTING.md)
 
-TypeScript SDK providing extension system, APIs, and type definitions for all Atomic Chat components.
+TypeScript SDK providing extension system, APIs, and type definitions for all Radium Chat components.
 
 ## Key Directories
 

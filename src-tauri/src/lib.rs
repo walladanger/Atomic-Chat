@@ -455,7 +455,7 @@ pub fn run() {
             {
                 if let Err(e) = crate::core::notifications::ensure_aumid_registered(
                     "chat.atomic.app",
-                    "Atomic Chat",
+                    "Radium Chat",
                 ) {
                     log::warn!("Failed to register AUMID for toast notifications: {e}");
                 }

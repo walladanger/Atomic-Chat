@@ -24,7 +24,7 @@ title: "Pin the filesystem MCP server version (cache-bust the stale `bun` copy) 
   and `start_mcp_server` rewrites `npx` → `bun x` with `BUN_INSTALL` pointing
   at our app cache (`<app>/.npx`) — a stale cached copy keeps being served;
   (2) spawned stdio MCP servers never set `current_dir`, so the child inherits
-  the app CWD (`AppData\Local\Atomic Chat`), which is exactly where old-version
+  the app CWD (`AppData\Local\Radium Chat`), which is exactly where old-version
   relative resolution lands. The "different dir each retry" loop is model
   behaviour (small local model hallucinating paths), **not** the cwd/version
   bug, and is out of scope.

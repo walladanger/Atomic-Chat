@@ -73,7 +73,7 @@ export type ConformanceScenarios = {
 }
 
 export type ConformanceHarness = {
-  /** Name for the suite heading, e.g. 'Atomic Media Worker'. */
+  /** Name for the suite heading, e.g. 'Radium Media Worker'. */
   name: string
   descriptor: MediaProviderDescriptor
   createAdapter: (descriptor: MediaProviderDescriptor) => MediaProviderAdapter

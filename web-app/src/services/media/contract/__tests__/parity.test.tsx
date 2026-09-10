@@ -13,7 +13,7 @@
  * byte-identical to what v1 sent. Nothing here restates what the form does; it
  * asks the form itself, end to end, exactly as the worker would see it.
  *
- * If this passes, a running Atomic Media Worker cannot tell that the entire UI
+ * If this passes, a running Radium Media Worker cannot tell that the entire UI
  * was rewritten underneath it.
  */
 import { fireEvent, render, screen } from '@testing-library/react'
@@ -100,7 +100,7 @@ if (!model) throw new Error('fixture produced no models')
 
 const descriptor: MediaProviderDescriptor = {
   id: PROVIDER,
-  label: 'Atomic Media Worker',
+  label: 'Radium Media Worker',
   kind: 'local_worker',
   adapter: 'atomic-media-worker',
   enabled: true,

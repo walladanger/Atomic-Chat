@@ -15,7 +15,7 @@ describe('parseAtomicChatDeepLink', () => {
     })
   })
 
-  it('rejects non Atomic Chat schemes', () => {
+  it('rejects non Radium Chat schemes', () => {
     expect(
       parseAtomicChatDeepLink('jan://models/huggingface/owner/model-GGUF')
     ).toBeNull()

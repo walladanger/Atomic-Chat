@@ -7,7 +7,7 @@ title: "Add global SKILL.md capabilities to Agent mode"
 
 - **Context:** The Rust Agent had a fixed tool catalog but could not consume
   reusable Atomic Agent `SKILL.md` workflows, persist loaded instructions, or
-  expose local skill management in Atomic Chat.
+  expose local skill management in Radium Chat.
 - **Decision:** Use `<data-folder>/agent-skills` as the single skill root.
   Seed the 17 bundled starter skills on every startup, replacing only reserved
   bundled names while preserving custom directories and durable disabled

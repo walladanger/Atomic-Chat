@@ -4,7 +4,7 @@
  *
  * This module is types plus one pure function (`validateParams`). It adds no
  * runtime behaviour, performs no I/O, imports nothing from React, and does not
- * depend on `@/services/atomicMedia`, which is v1 and becomes the Atomic Media
+ * depend on `@/services/atomicMedia`, which is v1 and becomes the Radium Media
  * Worker adapter's private implementation detail.
  */
 

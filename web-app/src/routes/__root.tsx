@@ -73,7 +73,7 @@ function WindowFrame({ children }: { children: ReactNode }) {
             className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-[11px] font-medium text-muted-foreground"
             data-tauri-drag-region
           >
-            Atomic Chat
+            Radium Chat
           </div>
           <WindowControls />
         </div>

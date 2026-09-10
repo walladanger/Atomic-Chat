@@ -5,7 +5,7 @@ title: "Add a cross-platform \"Launch at startup\" toggle via `tauri-plugin-auto
 
 # 2026-06-09 — Add a cross-platform "Launch at startup" toggle via `tauri-plugin-autostart` (ATO-96)
 
-- **Context:** A Discord user (Andrej) asked whether Atomic Chat can be
+- **Context:** A Discord user (Andrej) asked whether Radium Chat can be
   configured to run at system startup; no such option existed. Investigation
   confirmed there was **no** autostart mechanism anywhere — no
   `tauri-plugin-autostart` in [`src-tauri/Cargo.toml`](src-tauri/Cargo.toml),
@@ -53,7 +53,7 @@ title: "Add a cross-platform \"Launch at startup\" toggle via `tauri-plugin-auto
   localStorage mirroring. **Cross-platform caveat to confirm at smoke-test:** on
   Linux AppImage, `auto-launch` relies on the `APPIMAGE` env var to write the
   correct exec path into the `.desktop` file — verify the generated
-  `~/.config/autostart/Atomic Chat.desktop` points at the AppImage, not an
+  `~/.config/autostart/Radium Chat.desktop` points at the AppImage, not an
   extracted temp path.
 - **Owner:** team.
 - **Links:** [ATO-96](https://linear.app/atomicchat/issue/ATO-96), §5 *Build &

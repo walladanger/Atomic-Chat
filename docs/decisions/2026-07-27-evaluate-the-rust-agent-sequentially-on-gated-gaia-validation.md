@@ -5,7 +5,7 @@ title: "Evaluate the Rust Agent sequentially on gated GAIA validation"
 
 # 2026-07-27 — Evaluate the Rust Agent sequentially on gated GAIA validation
 
-- **Context:** Atomic Chat needed a repeatable benchmark for its direct Rust
+- **Context:** Radium Chat needed a repeatable benchmark for its direct Rust
   Agent loop that fits one local model in memory and does not depend on the
   Tauri UI or IPC.
 - **Decision:** Add a feature-gated headless `gaia-eval` binary and

@@ -1,4 +1,4 @@
-# Подпись Atomic Chat (Jan / Tauri) для macOS
+# Подпись Radium Chat (Jan / Tauri) для macOS
 
 По [официальной схеме Tauri](https://v2.tauri.app/distribute/sign/macos/): переменные окружения + `yarn build`. Ручной `codesign` по всему `.app` не нужен — его выполняет CLI Tauri при сборке.
 
@@ -39,7 +39,7 @@ CI=false yarn build
 
 Готовый **universal** DMG (Intel + Apple Silicon):
 
-`src-tauri/target/universal-apple-darwin/release/bundle/dmg/Atomic Chat_*.dmg`
+`src-tauri/target/universal-apple-darwin/release/bundle/dmg/Radium Chat_*.dmg`
 
 (имя берётся из `productName` в `tauri.conf.json`.)
 
@@ -101,7 +101,7 @@ Tauri отправит билд на нотаризацию после сбор�
 CI=false APPLE_SIGNING_IDENTITY="…" yarn build:web && yarn build:icon && yarn copy:assets:tauri && CI=false APPLE_SIGNING_IDENTITY="…" yarn build:tauri:darwin:native
 ```
 
-DMG: `src-tauri/target/release/bundle/dmg/Atomic Chat_*_aarch64.dmg` (на Apple Silicon).
+DMG: `src-tauri/target/release/bundle/dmg/Radium Chat_*_aarch64.dmg` (на Apple Silicon).
 
 ---
 

@@ -59,7 +59,7 @@ describe('useAssistant', () => {
 
     const updatedAssistant = {
       ...defaultAssistant,
-      name: 'Updated Atomic Chat',
+      name: 'Updated Radium Chat',
       description: 'Updated description',
     }
 
@@ -67,7 +67,7 @@ describe('useAssistant', () => {
       result.current.updateAssistant(updatedAssistant)
     })
 
-    expect(result.current.assistants[0].name).toBe('Updated Atomic Chat')
+    expect(result.current.assistants[0].name).toBe('Updated Radium Chat')
     expect(result.current.assistants[0].description).toBe('Updated description')
   })
 
@@ -180,7 +180,7 @@ describe('useAssistant', () => {
 
     const updatedDefaultAssistant = {
       ...defaultAssistant,
-      name: 'Updated Atomic Chat Name',
+      name: 'Updated Radium Chat Name',
     }
 
     act(() => {
@@ -188,7 +188,7 @@ describe('useAssistant', () => {
     })
 
     expect(result.current.currentAssistant.name).toBe(
-      'Updated Atomic Chat Name'
+      'Updated Radium Chat Name'
     )
   })
 

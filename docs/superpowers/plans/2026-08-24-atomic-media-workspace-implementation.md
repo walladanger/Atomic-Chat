@@ -1,10 +1,10 @@
-# Atomic Media Workspace Implementation Plan
+# Radium Media Workspace Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add the approved Media workspace and direct Atomic Media Worker integration, then make the main Windows Tauri window frameless while preserving existing Chat/Agent behavior.
+**Goal:** Add the approved Media workspace and direct Radium Media Worker integration, then make the main Windows Tauri window frameless while preserving existing Chat/Agent behavior.
 
-**Architecture:** Extend the existing workspace switch and TanStack Router with a dedicated Media route. Keep all worker communication in a focused typed service/hook pair, and render the approved Media Studio UI using existing Atomic Chat primitives and theme tokens. Reuse the existing Tauri `WindowControls` component and apply Windows-only main-window decoration changes rather than replacing platform shell behavior globally.
+**Architecture:** Extend the existing workspace switch and TanStack Router with a dedicated Media route. Keep all worker communication in a focused typed service/hook pair, and render the approved Media Studio UI using existing Radium Chat primitives and theme tokens. Reuse the existing Tauri `WindowControls` component and apply Windows-only main-window decoration changes rather than replacing platform shell behavior globally.
 
 **Tech Stack:** React 19, TypeScript, TanStack Router, Zustand, Tailwind/shadcn, Vitest, Tauri 2, Rust configuration.
 
@@ -14,9 +14,9 @@
 
 - Do only what was asked; no opportunistic refactors.
 - Preserve existing Chat, Agent, model-provider, settings, and localhost `:1337/v1` behavior.
-- New user-facing and code identifiers use Atomic / Atomic Chat naming.
+- New user-facing and code identifiers use Atomic / Radium Chat naming.
 - Do not rename load-bearing legacy `jan*` or `@janhq/*` identifiers.
-- Atomic Media Worker remains an external localhost service at `127.0.0.1:13420`; do not rebuild it in this feature.
+- Radium Media Worker remains an external localhost service at `127.0.0.1:13420`; do not rebuild it in this feature.
 - Device selection defaults to `auto`; do not hard-code the user's current GPU topology.
 - No new runtime dependency unless separately approved.
 - Commits go only to `feature/atomic-media-workspace` until reviewed.
@@ -49,7 +49,7 @@ Expected: FAIL because the current component only supports boolean Chat/Agent se
 
 - [ ] **Step 3: Generalize the selector minimally**
 
-Replace the boolean-only callback with an explicit workspace value type local to the component or a narrowly shared type. Keep the existing visual classes intact so the approved Media button looks native to Atomic Chat.
+Replace the boolean-only callback with an explicit workspace value type local to the component or a narrowly shared type. Keep the existing visual classes intact so the approved Media button looks native to Radium Chat.
 
 - [ ] **Step 4: Wire Media selection in the left sidebar**
 
@@ -71,7 +71,7 @@ Commit message: `feat: add Media workspace navigation`
 
 ---
 
-### Task 2: Add the typed Atomic Media Worker client
+### Task 2: Add the typed Radium Media Worker client
 
 **Files:**
 - Create: `web-app/src/services/atomicMedia/types.ts`
@@ -107,7 +107,7 @@ Expected: PASS.
 
 - [ ] **Step 6: Commit**
 
-Commit message: `feat: add Atomic Media Worker client`
+Commit message: `feat: add Radium Media Worker client`
 
 ---
 
@@ -156,7 +156,7 @@ Commit message: `feat: add Media job polling state`
 
 **Interfaces:**
 - Consumes: `useAtomicMediaJob`.
-- Produces: the approved Media Studio UI using Atomic Chat's existing design tokens and controls.
+- Produces: the approved Media Studio UI using Radium Chat's existing design tokens and controls.
 
 - [ ] **Step 1: Write failing UI tests**
 
@@ -184,7 +184,7 @@ Expected: PASS.
 
 - [ ] **Step 7: Commit**
 
-Commit message: `feat: build Atomic Media Studio`
+Commit message: `feat: build Radium Media Studio`
 
 ---
 
@@ -272,7 +272,7 @@ Confirm no unrelated UI, provider, backend, settings, naming, or route behavior 
 
 - [ ] **Step 6: Commit any verification-only fixes**
 
-Commit message: `test: verify Atomic Media workspace`
+Commit message: `test: verify Radium Media workspace`
 
 - [ ] **Step 7: Open a draft pull request**
 

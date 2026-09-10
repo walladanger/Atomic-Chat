@@ -124,7 +124,7 @@ title: "Replace `janhq/model-catalog` + Fuse.js with curated `AtomicBot-ai/atomi
  - **Catalog freshness.** A 12-hour cron + manual / external dispatch
    means new community quants (and our own `AtomicChat/*` releases)
    surface in Hub within an hour of merging the corresponding PR
-   against the catalog repo — no Atomic Chat release required.
+   against the catalog repo — no Radium Chat release required.
  - **Search quality.** On a 167-entry sanity scrape of `ggml-org`,
    the MiniSearch index builds in 7ms and answers per-query in <1ms.
    Long-tail queries like `qwen3.5 mlx 4bit` rank the

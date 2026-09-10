@@ -5,7 +5,7 @@ title: "Align Agent context budgeting with Atomic Agent"
 
 # 2026-07-22 — Align Agent context budgeting with Atomic Agent
 
-- **Context:** Atomic Chat's Rust Agent capped normal completions below Atomic
+- **Context:** Radium Chat's Rust Agent capped normal completions below Atomic
   Agent, packed conversation history by characters instead of estimated
   tokens, did not account for the active llama.cpp session's physical
   context, and could not use the Local API Server's existing context

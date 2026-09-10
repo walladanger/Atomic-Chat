@@ -9,7 +9,7 @@ title: "Route text-only MLX checkpoints by embodied weights and keep failed load
  `config.json` (`vision_config`, image token ids, or a conditional-generation
  architecture) while shipping only language-model weights. `mlx-vlm` selected
  the VLM class before inspecting those weights, so strict loading failed on
- absent vision tensors. Atomic Chat also held the MLX session-map mutex across
+ absent vision tensors. Radium Chat also held the MLX session-map mutex across
  validation, process spawn, and readiness waits; `/v1/models` uses that map and
  could therefore block behind a long or failed load. The desktop extension
  compounded the mismatch by advertising vision from stale `mmproj_path` or

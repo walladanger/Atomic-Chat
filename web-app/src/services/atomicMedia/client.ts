@@ -45,7 +45,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function asJobSnapshot(value: unknown): AtomicMediaJobSnapshot {
   if (!isRecord(value)) {
     throw new AtomicMediaClientError(
-      'Atomic Media Worker returned a non-object job response.',
+      'Radium Media Worker returned a non-object job response.',
       'invalid_response'
     )
   }
@@ -58,7 +58,7 @@ function asJobSnapshot(value: unknown): AtomicMediaJobSnapshot {
     !JOB_STATUSES.includes(status as AtomicMediaJobStatus)
   ) {
     throw new AtomicMediaClientError(
-      'Atomic Media Worker returned an invalid job response.',
+      'Radium Media Worker returned an invalid job response.',
       'invalid_response',
       { details: value }
     )
@@ -75,7 +75,7 @@ function asHealth(value: unknown): AtomicMediaHealth {
     typeof value.status !== 'string'
   ) {
     throw new AtomicMediaClientError(
-      'Atomic Media Worker returned an invalid health response.',
+      'Radium Media Worker returned an invalid health response.',
       'invalid_response',
       { details: value }
     )
@@ -108,7 +108,7 @@ export class AtomicMediaClient {
       const value = await this.requestJson('/capabilities', { signal })
       if (!isRecord(value)) {
         throw new AtomicMediaClientError(
-          'Atomic Media Worker returned invalid capabilities.',
+          'Radium Media Worker returned invalid capabilities.',
           'invalid_response',
           { details: value }
         )
@@ -154,7 +154,7 @@ export class AtomicMediaClient {
       })
     } catch (cause) {
       throw new AtomicMediaClientError(
-        'Atomic Media Worker is unavailable.',
+        'Radium Media Worker is unavailable.',
         'network_error',
         { cause }
       )
@@ -167,7 +167,7 @@ export class AtomicMediaClient {
         payload = await response.json()
       } catch (cause) {
         throw new AtomicMediaClientError(
-          'Atomic Media Worker returned invalid JSON.',
+          'Radium Media Worker returned invalid JSON.',
           'invalid_response',
           { status: response.status, cause }
         )
@@ -178,7 +178,7 @@ export class AtomicMediaClient {
 
     if (!response.ok) {
       throw new AtomicMediaClientError(
-        `Atomic Media Worker request failed with HTTP ${response.status}.`,
+        `Radium Media Worker request failed with HTTP ${response.status}.`,
         'http_error',
         { status: response.status, details: payload }
       )

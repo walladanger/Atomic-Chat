@@ -152,7 +152,7 @@ mod tests {
     #[test]
     fn rejects_unrelated_names() {
         assert!(!is_backend_name("server"));
-        assert!(!is_backend_name("Atomic Chat"));
+        assert!(!is_backend_name("Radium Chat"));
         assert!(!is_backend_name("node"));
         assert!(!is_backend_name("my-llama-server")); // prefix must be at the start
     }

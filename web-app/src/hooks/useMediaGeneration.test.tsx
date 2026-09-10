@@ -25,7 +25,7 @@ import { useMediaGeneration } from './useMediaGeneration'
 
 const descriptor: MediaProviderDescriptor = {
   id: 'worker',
-  label: 'Atomic Media Worker',
+  label: 'Radium Media Worker',
   kind: 'local_worker',
   adapter: 'atomic-media-worker',
   enabled: true,

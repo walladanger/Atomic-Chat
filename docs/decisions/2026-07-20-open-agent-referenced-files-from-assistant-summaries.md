@@ -11,7 +11,7 @@ title: "Open Agent-referenced files from assistant summaries"
 - **Decision:** In Agent assistant messages only, link absolute paths observed
   in tool-call arguments and original filenames from preceding attachment
   parts. Resolve duplicate filenames conservatively, intercept only an
-  internal Atomic Chat file-link URL, and open the resolved local path through
+  internal Radium Chat file-link URL, and open the resolved local path through
   the existing desktop system command. Render absolute references using only
   the filename as the visible link label while retaining the full path as the
   hidden open target.

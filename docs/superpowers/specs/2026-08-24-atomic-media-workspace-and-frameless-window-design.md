@@ -1,18 +1,18 @@
-# Atomic Media Workspace and Frameless Window Design
+# Radium Media Workspace and Frameless Window Design
 
 ## Goal
 
-Add a first-class Media workspace to Atomic Chat and make the Windows desktop shell visually self-contained, while preserving all existing Chat, Agent, model, settings, and backend behavior.
+Add a first-class Media workspace to Radium Chat and make the Windows desktop shell visually self-contained, while preserving all existing Chat, Agent, model, settings, and backend behavior.
 
 ## Approved Product Direction
 
-The approved UI is the dark Atomic Chat Media Studio mockup already reviewed in this project. The implementation should reproduce that direction rather than redesign it.
+The approved UI is the dark Radium Chat Media Studio mockup already reviewed in this project. The implementation should reproduce that direction rather than redesign it.
 
 ### Media workspace
 
 - Extend the existing Chat / Agent segmented control with a third `Media` choice.
 - Media is a separate workspace, not a modified chat thread.
-- The page uses Atomic Chat's existing colors, spacing, typography, buttons, borders, sidebar, and dark/light theme tokens.
+- The page uses Radium Chat's existing colors, spacing, typography, buttons, borders, sidebar, and dark/light theme tokens.
 - Primary layout:
   - left-side generation settings;
   - large media preview / output canvas;
@@ -38,11 +38,11 @@ The approved UI is the dark Atomic Chat Media Studio mockup already reviewed in 
 
 ## Media Worker Architecture
 
-Atomic Chat talks directly to the existing localhost Atomic Media Worker. MCP remains optional and is not part of the primary runtime path for this feature.
+Radium Chat talks directly to the existing localhost Radium Media Worker. MCP remains optional and is not part of the primary runtime path for this feature.
 
 Primary topology:
 
-`Atomic Chat UI -> Atomic Media Worker -> local image/video models`
+`Radium Chat UI -> Radium Media Worker -> local image/video models`
 
 Initial endpoint base URL:
 
@@ -82,13 +82,13 @@ These are defaults only, not hard-coded hardware assumptions.
 
 ## Windows Frameless Shell
 
-Atomic Chat is already a Tauri application and already contains `web-app/src/components/WindowControls.tsx` with minimize, maximize/restore, and close behavior. Reuse that component rather than implementing a second set of window actions.
+Radium Chat is already a Tauri application and already contains `web-app/src/components/WindowControls.tsx` with minimize, maximize/restore, and close behavior. Reuse that component rather than implementing a second set of window actions.
 
-Windows should use custom application chrome so the Atomic Chat UI becomes the visible outer window:
+Windows should use custom application chrome so the Radium Chat UI becomes the visible outer window:
 
 - remove the normal Windows title bar / decoration from the main window;
 - keep standard window resizing behavior;
-- provide draggable regions in Atomic Chat's own top chrome;
+- provide draggable regions in Radium Chat's own top chrome;
 - retain working minimize, maximize/restore, and close controls;
 - preserve native maximize behavior and sensible edge snapping;
 - avoid affecting macOS traffic-light behavior or mobile builds;
@@ -100,12 +100,12 @@ Rounded corners / shadows should be achieved only where Tauri/Windows behavior p
 
 Do not:
 
-- refactor unrelated Atomic Chat code;
+- refactor unrelated Radium Chat code;
 - rename legacy `jan*` / `@janhq/*` identifiers;
 - change the local OpenAI-compatible API on port 1337;
 - change model-provider logic;
 - replace the existing Chat or Agent mode state model unless the Media workspace absolutely requires an extension point;
-- rebuild the Atomic Media Worker;
+- rebuild the Radium Media Worker;
 - make MCP mandatory;
 - add unrelated features or redesign other screens.
 
@@ -139,4 +139,4 @@ Before completion, run the repository's focused frontend checks while iterating 
 
 ## Success Criteria
 
-A Windows user can open Atomic Chat, click `Media` beside `Chat / Agent`, enter a prompt, choose supported generation settings, submit a local generation job, watch its state, and view the completed image/video inside Atomic Chat. The application itself is visually the window, with no separate generic Windows title-bar frame around the main Atomic Chat UI, and existing Chat/Agent behavior remains unchanged.
+A Windows user can open Radium Chat, click `Media` beside `Chat / Agent`, enter a prompt, choose supported generation settings, submit a local generation job, watch its state, and view the completed image/video inside Radium Chat. The application itself is visually the window, with no separate generic Windows title-bar frame around the main Radium Chat UI, and existing Chat/Agent behavior remains unchanged.

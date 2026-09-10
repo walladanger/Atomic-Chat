@@ -1,11 +1,11 @@
 {
   "web-app/src/containers/media/MediaGenerationForm.tsx": "6dfe58139dbd3a0da64833731a2c96ad4630d5d27dee8ff9d2a553c323e5ab9b",
   "web-app/src/containers/media/MediaJobStatus.tsx": "2557c3fea866f63f1ddc959cb66203a53bf0c8a5fbfdb00b35b2eb7c9b5a1c1a",
-  "web-app/src/containers/media/MediaPreview.tsx": "d6cd23fc80791cca8eab41db40811e410b88f6510b3d1a19df11103e388171d4",
-  "web-app/src/containers/media/MediaStudio.test.tsx": "98fe429ab138776285d5d55fccaf7ef0a3ef3c72f226e4b6b67f67dc81acaf59",
-  "web-app/src/containers/media/MediaStudio.tsx": "bf0ffbc69a7ea50aaa0d902052fe00a4f5c740cc9c1bb011d218c3e23d83a050",
+  "web-app/src/containers/media/MediaPreview.tsx": "05e9e630db2695e935b9788b70d7cc5a0c5f9d4b8722a428ad63dde0859faf57",
+  "web-app/src/containers/media/MediaStudio.test.tsx": "d3484fdf7bfcad77a3a43e958402228150ca024ddf13b2bb383d90198bb55b7d",
+  "web-app/src/containers/media/MediaStudio.tsx": "cbeab0d874b057e80c526e837069c4164fe8aa88c366302bff819a1ac566f319",
   "web-app/src/routes/media.tsx": "997102f3082ee9756ddba73339f01c7a3c58bd7151e622481851104bb1f2ea92",
   "web-app/src/services/atomicMedia/client.test.ts": "e51009e8936cd5cab27d39bb379c2b51de56da1bf43ed84cb0f78cbe876ddac3",
-  "web-app/src/services/atomicMedia/client.ts": "e632f9720703028f23c4fa502529f2157a15822498cb5fead412cf687cddc197",
+  "web-app/src/services/atomicMedia/client.ts": "84cdba38d633e9008ef63160838942d434f21077375980eafab14c4d7885e761",
   "web-app/src/services/atomicMedia/types.ts": "673f0774e43c18a262a5a1e316dd32d57fdabe3f2130ebb3758c36abc5d6c434"
 }

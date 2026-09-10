@@ -1,4 +1,4 @@
-# AGENTS.md — Atomic Chat
+# AGENTS.md — Radium Chat
 
 Operating instructions for AI coding agents in this repository.
 Everything here applies to **every** task. Anything that applies only sometimes
@@ -10,7 +10,7 @@ lives behind a link — follow the link when the task needs it.
 | Dev loop, data folders, troubleshooting | [`DEVELOP.md`](DEVELOP.md)                        |
 | Product overview, install, API examples | [`README.md`](README.md)                          |
 | Contribution conventions                | [`CONTRIBUTING.md`](CONTRIBUTING.md)              |
-| **Atomic Media work — read first**      | [tracker](docs/superpowers/plans/2026-09-08-model-agnostic-atomic-media-platform-tracker.xlsx) + [plan](docs/superpowers/plans/2026-09-08-model-agnostic-atomic-media-platform.md) |
+| **Radium Media work — read first**      | [tracker](docs/superpowers/plans/2026-09-08-model-agnostic-atomic-media-platform-tracker.xlsx) + [plan](docs/superpowers/plans/2026-09-08-model-agnostic-atomic-media-platform.md) |
 
 ---
 
@@ -23,7 +23,7 @@ backends sit behind that one facade; callers never need to know which is serving
 Targets: macOS (Universal), Windows x64, Linux (AppImage), iOS, Android.
 Apple Silicon is first-class.
 
-**Product name is Atomic Chat.** Hard fork of [Jan](https://github.com/janhq/jan);
+**Product name is Radium Chat.** Hard fork of [Jan](https://github.com/janhq/jan);
 much of the tree still carries `jan*` / `@janhq/*` names — see §4.
 
 ---
@@ -114,10 +114,10 @@ opportunistically breaks existing user installs.
 | `Cargo.toml` repo URL    | `github.com/janhq/jan` | leave                       |
 | Tauri bundle id          | `chat.atomic.app`      | use this                    |
 | Cargo crate              | `Atomic-Chat`          | use this                    |
-| Product name             | `Atomic Chat`          | use this                    |
+| Product name             | `Radium Chat`          | use this                    |
 
 **All new** modules, packages, env vars, log prefixes, CLI subcommands,
-telemetry events, user-facing strings and docs use `atomic` / `Atomic Chat`.
+telemetry events, user-facing strings and docs use `atomic` / `Radium Chat`.
 Wiring new code into an existing `@janhq/*` package is fine; adding a new
 `jan*` identifier is not.
 
@@ -168,7 +168,7 @@ defaults on conflict.
 8. **Record non-trivial decisions** as a new file in `docs/decisions/`
    (architecture, backend selection, perf trade-off, security default, schema
    or migration). Same session, before you finish. See §7.
-9. **Touching Atomic Media?** Open the tracker linked at the top of this file
+9. **Touching Radium Media?** Open the tracker linked at the top of this file
    *before* writing anything, work the first row that is not Done, and update
    its Status in the same commit. Task 0 is a hard gate — `make verify` is red
    until it lands, and decision Q1 is the user's call, not yours. Starting cold?

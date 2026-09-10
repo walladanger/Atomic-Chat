@@ -122,7 +122,7 @@ export function MediaStudio() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-              Atomic Media
+              Radium Media
             </p>
             <h1 className="mt-0.5 font-studio text-xl font-medium text-foreground">
               Media Studio

@@ -15,7 +15,7 @@ title: "Give Agent runs a shared default workspace"
   value through to Rust when no custom directory is selected.
 - **Consequences:** Fresh installs and upgraded profiles share one reliable
   Agent workspace without an initial picker step. Existing custom thread
-  workspaces remain authoritative, and changing the configured Atomic Chat
+  workspaces remain authoritative, and changing the configured Radium Chat
   data folder naturally moves the default workspace root.
 - **Owner:** team.
 - **Links:** [`src-tauri/src/core/agent/workspace.rs`](src-tauri/src/core/agent/workspace.rs),
