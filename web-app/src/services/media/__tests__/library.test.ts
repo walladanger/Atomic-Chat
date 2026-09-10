@@ -267,3 +267,72 @@ describe('createMediaLibrary — mutation', () => {
     expect(library.list()).toEqual([])
   })
 })
+
+/**
+ * Task 13 Step 1 - deleting an asset must remove the FILE as well as the index
+ * entry, which is what the plan asks for and what a user clicking "Delete"
+ * plainly means.
+ *
+ * Task 8 built `remove` as an index-only operation. Left that way the library
+ * would forget a generation while its bytes stayed on disk forever, so the
+ * user's disk fills with files nothing references and no UI can reach.
+ */
+describe('remove deletes the bytes, not just the record', () => {
+  it('deletes the asset file and its thumbnail', async () => {
+    const fs = fakeFs()
+    const library = build(fs)
+    const entry = asset('01', { thumb_path: `${DATA_FOLDER}\\media\\thumbs\\01.webp` })
+    fs.files.set(entry.path, new Uint8Array([1]))
+    fs.files.set(entry.thumb_path!, new Uint8Array([2]))
+
+    await library.add([entry])
+    await library.remove('01')
+
+    expect(fs.files.has(entry.path)).toBe(false)
+    expect(fs.files.has(entry.thumb_path!)).toBe(false)
+    expect(library.list()).toHaveLength(0)
+  })
+
+  it('still forgets the entry when the file is already gone', async () => {
+    const fs = fakeFs()
+    const library = build(fs)
+    const entry = asset('02')
+    // Never written: the user deleted it in Explorer, or a sync tool moved it.
+    await library.add([entry])
+
+    await expect(library.remove('02')).resolves.toBeUndefined()
+    expect(library.list()).toHaveLength(0)
+  })
+
+  it('forgets the entry even when deleting the file fails', async () => {
+    const fs = fakeFs()
+    const library = build(fs)
+    const entry = asset('03')
+    fs.files.set(entry.path, new Uint8Array([1]))
+    await library.add([entry])
+
+    // A locked file on Windows, or a permission error. The index entry must
+    // still go: refusing to forget would leave a row the user cannot delete.
+    fs.remove = async () => {
+      throw new Error('EPERM')
+    }
+
+    await expect(library.remove('03')).resolves.toBeUndefined()
+    expect(library.list()).toHaveLength(0)
+  })
+
+  it('leaves other assets files alone', async () => {
+    const fs = fakeFs()
+    const library = build(fs)
+    const keep = asset('keep')
+    const drop = asset('drop')
+    fs.files.set(keep.path, new Uint8Array([1]))
+    fs.files.set(drop.path, new Uint8Array([2]))
+
+    await library.add([keep, drop])
+    await library.remove('drop')
+
+    expect(fs.files.has(keep.path)).toBe(true)
+    expect(fs.files.has(drop.path)).toBe(false)
+  })
+})

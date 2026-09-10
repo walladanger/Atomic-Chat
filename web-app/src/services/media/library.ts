@@ -180,11 +180,34 @@ export function createMediaLibrary(deps: MediaLibraryDeps): MediaLibrary {
     },
 
     async remove(assetId) {
-      const before = assets.length
+      const target = assets.find((entry) => entry.asset_id === assetId)
+      if (!target) return
+
       assets = assets.filter((entry) => entry.asset_id !== assetId)
-      if (assets.length === before) return
       notify()
       await save()
+
+      // The bytes go too. An index-only delete would forget the generation
+      // while its file stayed on disk forever - unreachable from any UI and
+      // still consuming the space, which for video is measured in gigabytes.
+      //
+      // Deliberately AFTER the index is saved, and deliberately tolerant: a
+      // file already gone, or locked by another process, must not resurrect a
+      // row the user has just deleted and cannot delete again. Forgetting an
+      // entry whose file survives is recoverable; keeping an entry the user
+      // told us to remove is not.
+      //
+      // Note this deletes ADOPTED files too - outputs a provider wrote in its
+      // own folder and materialisation pointed at rather than copying. That is
+      // what "delete" means here, and it is the user's own instruction.
+      for (const path of [target.path, target.thumb_path]) {
+        if (!path) continue
+        try {
+          await deps.fs.remove(path)
+        } catch (cause) {
+          deps.warn?.(`could not delete ${path}`, cause)
+        }
+      }
     },
 
     async setFavourite(assetId, favourite) {

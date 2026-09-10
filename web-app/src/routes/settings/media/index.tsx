@@ -6,7 +6,7 @@
  * behaviour lives in the containers so it can be tested without a router.
  */
 
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 
 import HeaderPage from '@/containers/HeaderPage'
@@ -38,6 +38,20 @@ function MediaSettings() {
           <span>Media</span>
         </HeaderPage>
         <div className="flex flex-col gap-4 p-4">
+          {/*
+            The library's in-app entry point lives here for now. The natural
+            home is a tab in the Media workspace itself, but routes/media.tsx
+            and MediaStudio.tsx are both frozen by the protected surface, so
+            putting it there needs a guard re-baseline and the user's explicit
+            authorisation. See decision D17.
+          */}
+          <Link
+            to={route.media_library}
+            className="text-sm underline underline-offset-4"
+          >
+            Open the media library
+          </Link>
+
           <ProviderList />
 
           {providers.length > 1 && (
