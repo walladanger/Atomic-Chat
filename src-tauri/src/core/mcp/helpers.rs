@@ -263,9 +263,9 @@ async fn connect_remote_mcp(
             protocol_version: Default::default(),
             capabilities: ClientCapabilities::default(),
             client_info: Implementation {
-                name: "Atomic Chat MCP Client".to_string(),
+                name: "Radium Chat MCP Client".to_string(),
                 version: env!("CARGO_PKG_VERSION").to_string(),
-                title: Some("Atomic Chat".to_string()),
+                title: Some("Radium Chat".to_string()),
                 website_url: None,
                 icons: None,
             },

@@ -5,7 +5,7 @@ title: "Add a \"Launch\" page to install + configure external coding agents / as
 
 # 2026-06-01 — Add a "Launch" page to install + configure external coding agents / assistants against the local OpenAI-compatible API
 
-- **Context:** To use Atomic Chat's local models from external agents
+- **Context:** To use Radium Chat's local models from external agents
  (Claude Code, Codex CLI, OpenCode, Hermes, OpenClaw) users had to
  hand-edit each agent's config to point at `http://localhost:1337/v1`.
  Ollama solves the same problem with `ollama launch <agent>`

@@ -74,7 +74,7 @@ export default class JanAssistantExtension extends AssistantExtension {
     }
 
     if (currentVersion < 2) {
-      console.log('Running migration v2: Update to Atomic Chat instructions')
+      console.log('Running migration v2: Update to Radium Chat instructions')
       await this.migrateToAtomicChatInstructions()
       await this.saveMigrationVersion(2)
     }
@@ -89,7 +89,7 @@ export default class JanAssistantExtension extends AssistantExtension {
    */
   private async migrateAssistantInstructions(): Promise<void> {
     const OLD_INSTRUCTION = 'You are a helpful AI assistant.'
-    const NEW_INSTRUCTION = 'You are Atomic Chat, a helpful AI assistant.'
+    const NEW_INSTRUCTION = 'You are Radium Chat, a helpful AI assistant.'
 
     if (!(await fs.existsSync('file://assistants'))) {
       return
@@ -127,11 +127,11 @@ export default class JanAssistantExtension extends AssistantExtension {
   }
 
   /**
-   * Migration v2: Update assistant instructions to Atomic Chat format and set default parameters
+   * Migration v2: Update assistant instructions to Radium Chat format and set default parameters
    */
   private async migrateToAtomicChatInstructions(): Promise<void> {
     const OLD_INSTRUCTION_PREFIX = 'You are Jan, a helpful AI assistant.'
-    const NEW_INSTRUCTION = `You are Atomic Chat, a helpful AI assistant who assists users with their requests. Atomic Chat is trained by Atomic Chat (https://atomic.chat).
+    const NEW_INSTRUCTION = `You are Radium Chat, a helpful AI assistant who assists users with their requests. Radium Chat is trained by Radium Chat (https://atomic.chat).
 
 You must output your response in the exact language used in the latest user message. Do not provide translations or switch languages unless explicitly instructed to do so. If the input is mostly English, respond in English.
 
@@ -258,9 +258,9 @@ Current date: {{current_date}}`
     created_at: Date.now() / 1000,
     name: 'Atomic Chat',
     description:
-      'Atomic Chat is a helpful desktop assistant that can reason through complex tasks and use tools to complete them on the user’s behalf.',
+      'Radium Chat is a helpful desktop assistant that can reason through complex tasks and use tools to complete them on the user’s behalf.',
     model: '*',
-    instructions: `You are Atomic Chat, a helpful AI assistant who assists users with their requests. Atomic Chat is trained by Atomic Chat (https://atomic.chat).
+    instructions: `You are Radium Chat, a helpful AI assistant who assists users with their requests. Radium Chat is trained by Radium Chat (https://atomic.chat).
 
 You must output your response in the exact language used in the latest user message. Do not provide translations or switch languages unless explicitly instructed to do so. If the input is mostly English, respond in English.
 

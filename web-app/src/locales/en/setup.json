@@ -12,8 +12,8 @@
   "localModel": "Set up local model",
   "remoteProvider": "Set up remote provider",
   "turboQuantTagline": "Local AI models on your device — blazing fast on average hardware.",
-  "welcomeTitle": "Hey, welcome to Atomic Chat!",
-  "welcomeSubtitle": "Atomic Chat needs a model to begin. Let's set it up.",
+  "welcomeTitle": "Hey, welcome to Radium Chat!",
+  "welcomeSubtitle": "Radium Chat needs a model to begin. Let's set it up.",
   "skip": "Skip",
   "modelUnavailable": "Not in catalog yet — open Hub after connection.",
   "localStep": {
@@ -42,7 +42,7 @@
     "switchingTitle": "Switching backend",
     "switchingDesc": "Activating {{backend}} without a restart…",
     "restartTitle": "Backend ready",
-    "restartDesc": "The optimal backend has been downloaded. It will activate the next time you start Atomic Chat.",
+    "restartDesc": "The optimal backend has been downloaded. It will activate the next time you start Radium Chat.",
     "restartLater": "Continue setup",
     "restartNow": "Restart now"
   },

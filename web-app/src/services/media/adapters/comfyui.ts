@@ -2,7 +2,7 @@
  * The ComfyUI provider adapter.
  *
  * The second implementation of `MediaProviderAdapter`, and the one that decides
- * whether the contract is real or was just a description of the Atomic Media
+ * whether the contract is real or was just a description of the Radium Media
  * Worker. It passes `__tests__/conformance.ts` unmodified.
  *
  * ComfyUI is deliberately unlike the worker in every way the contract has to

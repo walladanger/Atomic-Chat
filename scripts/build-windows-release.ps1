@@ -1,6 +1,6 @@
 #Requires -Version 5.1
 # scripts/build-windows-release.ps1
-# Atomic Chat - Windows release builder (local, no code signing)
+# Radium Chat - Windows release builder (local, no code signing)
 # Mirrors CI pipeline from release.yml: CPU-only backend, NSIS + MSI installers.
 #
 # Usage:

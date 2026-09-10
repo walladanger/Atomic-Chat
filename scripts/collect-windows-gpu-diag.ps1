@@ -1,12 +1,12 @@
 # =============================================================================
-# Atomic Chat — Windows GPU diagnostics collector
+# Radium Chat — Windows GPU diagnostics collector
 # =============================================================================
 #
-# Run this on a Windows host where Atomic Chat shows "No GPUs detected" or
+# Run this on a Windows host where Radium Chat shows "No GPUs detected" or
 # silently falls back to CPU inference. It collects everything we need to
 # diagnose the root cause and packages it into a single .zip on the Desktop.
 #
-# Nothing in this script touches Atomic Chat's state — it is read-only. It
+# Nothing in this script touches Radium Chat's state — it is read-only. It
 # does NOT upload anything; you decide where to send the .zip afterwards.
 #
 # Usage (one of):
@@ -54,7 +54,7 @@ function Try-Run($name, [scriptblock]$block) {
 
 Write-Host ''
 Write-Host '+--------------------------------------------------------------------------+' -ForegroundColor Green
-Write-Host '|   Atomic Chat - Windows GPU diagnostics collector                        |' -ForegroundColor Green
+Write-Host '|   Radium Chat - Windows GPU diagnostics collector                        |' -ForegroundColor Green
 Write-Host '|   This is read-only. Output goes to a .zip on your Desktop.              |' -ForegroundColor Green
 Write-Host '+--------------------------------------------------------------------------+' -ForegroundColor Green
 Write-Host ''
@@ -62,9 +62,9 @@ Write-Host "Output dir: $outDir"
 Write-Host "Zip target: $zipPath"
 
 # -----------------------------------------------------------------------------
-# 1. System / Atomic Chat / Windows basics
+# 1. System / Radium Chat / Windows basics
 # -----------------------------------------------------------------------------
-Write-Section '1/9  System & Atomic Chat version'
+Write-Section '1/9  System & Radium Chat version'
 
 Try-Run 'system-summary' {
     $atomicExe = @(
@@ -84,8 +84,8 @@ Try-Run 'system-summary' {
 
     $lines = @()
     $lines += "Collected at:        $(Get-Date -Format 'u')"
-    $lines += "Atomic Chat .exe:    $atomicExe"
-    $lines += "Atomic Chat version: $atomicVer"
+    $lines += "Radium Chat .exe:    $atomicExe"
+    $lines += "Radium Chat version: $atomicVer"
     $lines += ''
     $lines += "OS:                  $($os.Caption) / $($os.Version) / build $($os.BuildNumber)"
     $lines += "Architecture:        $($os.OSArchitecture)"
@@ -245,9 +245,9 @@ if (-not $installedBackends -or $installedBackends.Count -eq 0) {
 }
 
 # -----------------------------------------------------------------------------
-# 6. Atomic Chat persisted settings (read-only copy of relevant JSONs)
+# 6. Radium Chat persisted settings (read-only copy of relevant JSONs)
 # -----------------------------------------------------------------------------
-Write-Section '6/9  Atomic Chat persisted settings'
+Write-Section '6/9  Radium Chat persisted settings'
 
 Try-Run 'persisted-settings' {
     $settingsDir = Join-Path $outDir 'persisted-settings'
@@ -280,7 +280,7 @@ Try-Run 'persisted-settings' {
 # -----------------------------------------------------------------------------
 # 7. Last few app log files
 # -----------------------------------------------------------------------------
-Write-Section '7/9  Recent Atomic Chat log files'
+Write-Section '7/9  Recent Radium Chat log files'
 
 Try-Run 'app-logs' {
     if (-not (Test-Path $logRoot)) {
@@ -336,7 +336,7 @@ Try-Run 'environment' {
 }
 
 # -----------------------------------------------------------------------------
-# 9. Live llama-server.exe processes (if Atomic Chat is running a model)
+# 9. Live llama-server.exe processes (if Radium Chat is running a model)
 # -----------------------------------------------------------------------------
 Write-Section '9/9  Live llama-server.exe processes (snapshot)'
 
@@ -348,7 +348,7 @@ No live llama-server.exe processes were found at the moment of collection.
 
 If you want this diagnostic to include the DLLs llama-server actually loads
 during real inference, please:
-  1) Start Atomic Chat
+  1) Start Radium Chat
   2) Load any model and send one message in chat
   3) WHILE the model is still loaded, re-run this script
 
@@ -390,7 +390,7 @@ Write-Host ''
 Write-Host "Diagnostics zip:  $zipPath" -ForegroundColor Green
 Write-Host "Staging dir:      $outDir  (you can delete it after sending the zip)"
 Write-Host ''
-Write-Host 'Please send the .zip to the Atomic Chat team — drop it into the GitHub'
+Write-Host 'Please send the .zip to the Radium Chat team — drop it into the GitHub'
 Write-Host 'issue, Telegram support thread, or wherever you received this script.'
 Write-Host ''
 Write-Host 'The .zip contains NO secrets, NO chat history, NO model files — only'

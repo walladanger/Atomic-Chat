@@ -5,7 +5,7 @@ title: "Parse `openclaw.json` with a JSON5-lenient parser (ATO-87)"
 
 # 2026-06-05 — Parse `openclaw.json` with a JSON5-lenient parser (ATO-87)
 
-- **Context:** Atomic Chat and OpenClaw read the **same** file
+- **Context:** Radium Chat and OpenClaw read the **same** file
  `~/.openclaw/openclaw.json` with **different** parsers. OpenClaw uses
  lenient **JSON5** (comments, unquoted keys, trailing commas); our
  `configure_openclaw` in
@@ -13,7 +13,7 @@ title: "Parse `openclaw.json` with a JSON5-lenient parser (ATO-87)"
  used strict `serde_json::from_str`. A user (Discord, via [ATO-87](https://linear.app/atomicchat/issue/ATO-87))
  followed support advice to wrap `model` in `{ primary: ... }` with an
  **unquoted** `primary` key — valid JSON5, invalid strict JSON. OpenClaw
- accepted and reloaded the config (`config change applied`), while Atomic
+ accepted and reloaded the config (`config change applied`), while Radium
  Chat failed with `Could not parse … as JSON`, giving the user a
  contradictory signal. The old error was also uninformative (no line/column)
  and suggested a manual workaround instead of just parsing the file. This
@@ -28,7 +28,7 @@ title: "Parse `openclaw.json` with a JSON5-lenient parser (ATO-87)"
  JSON5 comments) — acceptable since JSON5 is a strict-JSON superset, so the
  normalized output is still valid for OpenClaw.
 - **Consequences:** Configs OpenClaw accepts (unquoted keys, comments,
- trailing commas) no longer break Atomic Chat's Launch-page OpenClaw flow.
+ trailing commas) no longer break Radium Chat's Launch-page OpenClaw flow.
  Parse errors now point at a location. The write step rewrites the file as
  strict JSON, so user comments are lost on the next `configure_openclaw`
  run — a deliberate, self-healing trade-off. Scope is limited to OpenClaw;

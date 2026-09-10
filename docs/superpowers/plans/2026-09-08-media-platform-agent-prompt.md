@@ -1,4 +1,4 @@
-# Agent kickoff prompt — model-agnostic Atomic Media platform
+# Agent kickoff prompt — model-agnostic Radium Media platform
 
 **Date:** 2026-09-08
 **Plan:** [`2026-09-08-model-agnostic-atomic-media-platform.md`](2026-09-08-model-agnostic-atomic-media-platform.md)
@@ -25,7 +25,7 @@ this prompt tells an agent how to re-enter it.
 Copy everything inside the fence.
 
 ```text
-You are working on Atomic Chat at:
+You are working on Radium Chat at:
 C:\Users\Warwick\.codex\.chatgpt-projects\g-p-6a89e2d97fa08191bee04f4c7a2099a9\Atomic-Chat
 
 Branch: feature/atomic-code-foundation

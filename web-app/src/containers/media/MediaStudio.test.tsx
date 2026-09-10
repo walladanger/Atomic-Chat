@@ -35,7 +35,7 @@ const capabilities = upcastV1Capabilities(
 
 const descriptor: MediaProviderDescriptor = {
   id: PROVIDER,
-  label: 'Atomic Media Worker',
+  label: 'Radium Media Worker',
   kind: 'local_worker',
   adapter: 'atomic-media-worker',
   enabled: true,
@@ -110,7 +110,7 @@ describe('MediaStudio', () => {
     render(<MediaStudio />)
 
     expect(
-      screen.getByText('Registry Video · Atomic Media Worker')
+      screen.getByText('Registry Video · Radium Media Worker')
     ).toBeInTheDocument()
   })
 
@@ -181,7 +181,7 @@ describe('MediaStudio', () => {
     // the provider select, and this is about the health row specifically.
     const providerList = screen.getByRole('list')
     expect(
-      within(providerList).getByText('Atomic Media Worker')
+      within(providerList).getByText('Radium Media Worker')
     ).toBeInTheDocument()
     expect(within(providerList).getByText(/Offline/)).toBeInTheDocument()
 

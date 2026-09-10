@@ -14,7 +14,7 @@ title: "Switch macOS autostart from `LaunchAgent` to `AppleScript` (real Login I
  sources: `tauri-plugin-autostart` 2.5.1 → `auto-launch` 0.5.0
  (`src/macos.rs`) — LaunchAgent mode writes
  `~/Library/LaunchAgents/{app_name}.plist` (`{app_name}` =
- `app.package_info().name`, here `"Atomic Chat"`; `RunAtLoad=true`) instead of
+ `app.package_info().name`, here `"Radium Chat"`; `RunAtLoad=true`) instead of
  registering a Login Item. So (a) it never shows under "Open at Login" (it can
  only appear under "Allow in the Background"), and (b) if autostart was ever
  enabled from a **dev** build, the plist's `ProgramArguments` points at the

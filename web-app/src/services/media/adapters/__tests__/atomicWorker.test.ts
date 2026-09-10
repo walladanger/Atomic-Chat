@@ -14,7 +14,7 @@ const v1 = fixture.payload as AtomicMediaCapabilities
 
 const descriptor: MediaProviderDescriptor = {
   id: 'atomic-media-worker',
-  label: 'Atomic Media Worker',
+  label: 'Radium Media Worker',
   kind: 'local_worker',
   adapter: 'atomic-media-worker',
   base_url: 'http://127.0.0.1:19999',
@@ -138,7 +138,7 @@ const scenarios: ConformanceScenarios = {
 }
 
 describeMediaAdapterConformance({
-  name: 'Atomic Media Worker',
+  name: 'Radium Media Worker',
   descriptor,
   createAdapter: createAtomicWorkerAdapter,
   scenarios,

@@ -3420,7 +3420,7 @@ async fn start_server_internal<R: Runtime>(
             return Err(Box::new(e));
         }
     };
-    log::info!("Atomic Chat API server started on http://{bound_addr}");
+    log::info!("Radium Chat API server started on http://{bound_addr}");
 
     let server_task = tokio::spawn(async move {
         if let Err(e) = server.await {
@@ -3460,7 +3460,7 @@ async fn start_server_internal<R: Runtime>(
         analytics_task,
         analytics_shutdown,
     });
-    log::info!("Atomic Chat API server started successfully on port {actual_port}");
+    log::info!("Radium Chat API server started successfully on port {actual_port}");
     Ok(actual_port)
 }
 
@@ -3475,7 +3475,7 @@ pub async fn stop_server(
             log::warn!("Local API Server analytics flush task failed: {e}");
         }
         handle.server_task.abort();
-        log::info!("Atomic Chat API server stopped");
+        log::info!("Radium Chat API server stopped");
     } else {
         log::debug!("Server was not running");
     }

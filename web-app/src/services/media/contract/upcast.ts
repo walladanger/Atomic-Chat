@@ -2,7 +2,7 @@
  * v1 -> v2 translation, and back.
  *
  * This is the keystone of the whole platform plan: it lets contract v2 land
- * against today's unmodified Atomic Media Worker. A user on the current worker
+ * against today's unmodified Radium Media Worker. A user on the current worker
  * sees an identical form with identical controls, driven by a completely
  * different mechanism.
  *

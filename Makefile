@@ -1,10 +1,10 @@
-# Makefile for Atomic Chat Electron App - Build, Lint, Test, and Clean
+# Makefile for Radium Chat Electron App - Build, Lint, Test, and Clean
 
 REPORT_PORTAL_URL ?= ""
 REPORT_PORTAL_API_KEY ?= ""
 REPORT_PORTAL_PROJECT_NAME ?= ""
-	REPORT_PORTAL_LAUNCH_NAME ?= "Atomic Chat App"
-REPORT_PORTAL_DESCRIPTION ?= "Atomic Chat App report"
+	REPORT_PORTAL_LAUNCH_NAME ?= "Radium Chat App"
+REPORT_PORTAL_DESCRIPTION ?= "Radium Chat App report"
 
 # Default target, does nothing
 all:
@@ -158,7 +158,7 @@ else
 endif
 
 # Dev workflow with CPU-only backend to test runtime GPU auto-download.
-# Clears downloaded backends from the Atomic Chat data folder
+# Clears downloaded backends from the Radium Chat data folder
 # (data\llamacpp-upstream\backends), starts with the upstream `win-cpu-x64`
 # build, then the llamacpp-upstream extension detects the GPU and downloads
 # the optimal backend (CUDA 12.4 / 13.1 / Vulkan) in the background — and
@@ -208,7 +208,7 @@ else
 	@echo "This target is for Windows only."
 endif
 
-# Full wipe of all Atomic Chat data on Windows — used to simulate a true
+# Full wipe of all Radium Chat data on Windows — used to simulate a true
 # first-launch as if the app had never been installed. Removes the four
 # default APPDATA / LOCALAPPDATA directories (see DEVELOP.md → "Where Atomic
 # Chat stores data on Windows"). Does NOT touch a custom data_folder if the
@@ -239,7 +239,7 @@ ifeq ($(CONFIRM),1)
 				Write-Host ('Not present: ' + $$p) -ForegroundColor Gray; \
 			} \
 		}; \
-		Write-Host 'Atomic Chat: full data wipe done.' -ForegroundColor Green; \
+		Write-Host 'Radium Chat: full data wipe done.' -ForegroundColor Green; \
 	"
 else
 	@powershell -NoProfile -ExecutionPolicy Bypass -Command "\
@@ -1265,7 +1265,7 @@ build: install-and-build install-rust-targets
 #   1. yarn tauri build (universal-apple-darwin, macos-конфиг)
 #      — Tauri подписывает и нотаризует .app, создаёт и подписывает .dmg
 #   2. scripts/rename-dmg-volume.sh
-#      — переименовывает том DMG в "Atomic Chat v<version>"
+#      — переименовывает том DMG в "Radium Chat v<version>"
 #      — ломает только подпись DMG-контейнера; .app внутри остаётся нотаризованным
 #   3. scripts/notarize-dmg-macos.sh
 #      — восстанавливает подпись DMG + нотаризует + стейплит (если заданы APPLE_ID/PASSWORD/TEAM_ID)

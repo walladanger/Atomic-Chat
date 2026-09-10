@@ -1,4 +1,4 @@
-# Model-Agnostic Atomic Media Platform — Design and Implementation Plan
+# Model-Agnostic Radium Media Platform — Design and Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -12,9 +12,9 @@
 
 ## Continuation prompt
 
-> Implement the model-agnostic Atomic Media platform described in this document,
+> Implement the model-agnostic Radium Media platform described in this document,
 > in the repository and branch named above. Read this plan, the two predecessor
-> Atomic Media documents, `AGENTS.md`, and `web-app/src/services/AGENTS.md`
+> Radium Media documents, `AGENTS.md`, and `web-app/src/services/AGENTS.md`
 > before editing. Resolve Task 0 (protected-surface reconciliation) with the user
 > before writing any production code — the scope guard is currently red and no
 > other task can be verified until that is settled. Then execute Tasks 1–17 in
@@ -65,7 +65,7 @@ Eleven files, ~1,100 lines total:
 | `web-app/src/services/atomicMedia/types.ts` | 138 | The entire wire contract |
 | `MediaStudio.test.tsx`, `useAtomicMediaJob.test.tsx`, `client.test.ts` | ~500 | Test surface |
 
-The Atomic Media Worker itself is **not in this repository**. A repository-wide
+The Radium Media Worker itself is **not in this repository**. A repository-wide
 search for `13420` returns four files only: `client.ts`, `client.test.ts`, and
 the two 2026-08-24 design/plan documents. There is no Rust-side supervisor, no
 sidecar entry, and no bundle rule — the worker is an external localhost process
@@ -95,7 +95,7 @@ or *open parameter vocabulary*. Those are §2's subject.
 ### 0.3 Blocker: the scope guard is red
 
 `make verify` runs `test-selective-v2032`, which runs
-`scripts/verify-selective-v2032.mjs`, which SHA-256-compares the eleven Atomic
+`scripts/verify-selective-v2032.mjs`, which SHA-256-compares the eleven Radium
 Media files against `scripts/selective-v2032-protected.json`. Commit `a13b71a83`
 modified eight of those eleven files without re-baselining the manifest. Current
 state:
@@ -113,7 +113,7 @@ Protected file changed: web-app/src/services/atomicMedia/types.ts
 
 Only `MediaJobStatus.tsx`, `MediaPreview.tsx` and `routes/media.tsx` still match.
 
-The guard was written to enforce the selective-update rule *"keep Atomic Media
+The guard was written to enforce the selective-update rule *"keep Radium Media
 byte-for-byte unchanged"*. That rule and this project are in direct conflict:
 a model-agnostic Media platform cannot be built without editing these files.
 §6 sets out the reconciliation, and Task 0 makes it the first thing done.
@@ -143,7 +143,7 @@ correct, and library-compatible choice. §13 Q4 records the alternative.
 
 - **Data root.** `%APPDATA%\Atomic Chat\data\` with siblings `models/`,
   `threads/`, `extensions/`, `logs/`, `store.json`, `mcp_config.json`
-  (`DEVELOP.md` §"Where Atomic Chat stores data on Windows"). Relocatable via
+  (`DEVELOP.md` §"Where Radium Chat stores data on Windows"). Relocatable via
   `Settings → Advanced → Change data folder location` (`change_app_data_folder`).
   A `media/` sibling is the only consistent choice; `AGENTS.md` §5 forbids
   inventing new data paths, so this must be derived from the same
@@ -186,7 +186,7 @@ The target state is all four, with the explicit non-goal that the **UI must neve
 learn a model's name**. The test for every design decision below is:
 
 > *Could a brand-new model, exposing a brand-new task with a brand-new parameter,
-> be made fully usable in Atomic Chat by editing a JSON manifest and restarting —
+> be made fully usable in Radium Chat by editing a JSON manifest and restarting —
 > with zero TypeScript changes and zero app release?*
 
 If the answer is no, the abstraction is in the wrong place.
@@ -287,7 +287,7 @@ come back.
 can *cause* a model to become installed.
 
 **Failure:** a first-run user with a healthy worker and no models sees
-*"No models available for this mode — Install a compatible model in Atomic Media
+*"No models available for this mode — Install a compatible model in Radium Media
 Worker, then refresh"* and has no in-app path forward. Compare the LLM side,
 which has a full Hub, download manager, and progress UI.
 → **Tasks 12, 15**
@@ -376,7 +376,7 @@ flowchart TB
     end
 
     subgraph EXT [External processes]
-        worker[Atomic Media Worker<br/>127.0.0.1:13420]
+        worker[Radium Media Worker<br/>127.0.0.1:13420]
         comfy[ComfyUI<br/>127.0.0.1:8188]
         cloud[Cloud media API]
     end
@@ -411,7 +411,7 @@ add the field, not the branch.
 
 ### 3.3 Why an adapter layer rather than "make the worker do it"
 
-The Atomic Media Worker is external, unversioned relative to the app, and owned
+The Radium Media Worker is external, unversioned relative to the app, and owned
 outside this repository. Three consequences:
 
 1. **The app cannot require a worker change to ship a feature.** The v1→v2
@@ -810,7 +810,7 @@ It must be explicitly added to the `DEVELOP.md` data-paths table (Task 16).
 ### 5.1 The v1 → v2 upcaster is the keystone
 
 The single most important property of this plan: **it lands against today's
-unmodified Atomic Media Worker.**
+unmodified Radium Media Worker.**
 
 `upcastV1Capabilities(payload: AtomicMediaCapabilities): MediaCapabilities`
 performs a total, lossless translation:
@@ -862,7 +862,7 @@ export const MEDIA_CONTRACT_MAX_SUPPORTED = 2
 | --- | --- |
 | `1` | Upcast to v2. Full functionality within v1's expressive limits. |
 | `2` | Used directly. |
-| `> 2` | Refuse the payload; render "This provider needs a newer Atomic Chat", offer the updater. **Never** partially parse a future contract. |
+| `> 2` | Refuse the payload; render "This provider needs a newer Radium Chat", offer the updater. **Never** partially parse a future contract. |
 | absent / malformed | Treat as offline-with-detail; render the existing "capabilities unavailable" panel. |
 
 Note that the current gate is `capabilities?.contract_version === 1`
@@ -899,7 +899,7 @@ verify` cannot pass and therefore no task in §7 can be verified.
 
 `scripts/selective-v2032-protected.json` freezes eleven Media files by hash. It
 was created to enforce a rule from a *different* project — the selective v2.0.32
-backend port — whose scope decision reads *"Keep Atomic Media routes, components,
+backend port — whose scope decision reads *"Keep Radium Media routes, components,
 layout, and generation behavior exactly unchanged."* That rule was correct for
 that project: it prevented an upstream merge from redesigning Media as a side
 effect.
@@ -948,7 +948,7 @@ This is §13 Q1 and is the one question that genuinely blocks the work.
 - Do only what the task says; no opportunistic refactors (`AGENTS.md` §6.1).
 - Never fabricate backend behaviour; a parameter exists because a provider
   declared it (`AGENTS.md` §6.2).
-- All new identifiers use `atomic` / Atomic Chat naming; no new `jan*`
+- All new identifiers use `atomic` / Radium Chat naming; no new `jan*`
   identifiers (`AGENTS.md` §4).
 - No new top-level folder, config file, or runtime dependency without explicit
   approval (`AGENTS.md` §6.6) — see §13 Q5.
@@ -1024,7 +1024,7 @@ Expected: PASS, `Selective v2.0.32 boundaries verified.`
 
 Commit message:
 ```
-chore(guard): re-baseline Atomic Media protected hashes
+chore(guard): re-baseline Radium Media protected hashes
 
 Accepts the Media changes in a13b71a83 (capability-driven generation).
 Adds scripts/rebaseline-selective-v2032.mjs so future re-baselines are a
@@ -1144,7 +1144,7 @@ Commit message: `feat(media): upcast v1 worker capabilities to contract v2`
 
 ---
 
-### Task 3: Extract the Atomic Media Worker adapter
+### Task 3: Extract the Radium Media Worker adapter
 
 **Files:**
 - Create: `web-app/src/services/media/adapters/types.ts`
@@ -1192,7 +1192,7 @@ Expected: PASS.
 
 - [ ] **Step 6: Commit**
 
-Commit message: `feat(media): add Atomic Media Worker provider adapter`
+Commit message: `feat(media): add Radium Media Worker provider adapter`
 
 ---
 
@@ -1223,7 +1223,7 @@ one of them.
 
 - [ ] **Step 3: Define the bundled baseline**
 
-Exactly one entry — the local Atomic Media Worker at `127.0.0.1:13420`,
+Exactly one entry — the local Radium Media Worker at `127.0.0.1:13420`,
 `origin: 'builtin'`, `enabled: true`. This preserves today's behaviour for every
 existing user with no migration.
 
@@ -1574,7 +1574,7 @@ feat(media): drive the Media Studio from the provider platform
 ```
 then, separately:
 ```
-chore(guard): re-baseline Atomic Media protected hashes
+chore(guard): re-baseline Radium Media protected hashes
 ```
 
 ---
@@ -1703,7 +1703,7 @@ media in the new AGENTS.md section.
 
 **Files:**
 - Create: six ADRs per §10
-- Modify: `docs/decisions/INDEX.md` (new "Atomic Media platform" section, six lines, record count updated)
+- Modify: `docs/decisions/INDEX.md` (new "Radium Media platform" section, six lines, record count updated)
 - Modify: `DEVELOP.md` (add `<data_folder>/media/` to the Windows data table)
 - Modify: `web-app/src/services/AGENTS.md` (media registry section)
 - Create: `docs/superpowers/specs/2026-09-08-model-agnostic-media-platform-design.md` if the design outgrows this plan
@@ -1797,7 +1797,7 @@ worker-supervisor process behaviour if Task 9 runs.
 
 `AGENTS.md` §6.8 requires these in the same session as the code.
 
-1. **Adopt a provider-adapter architecture for Atomic Media** — why the seam is
+1. **Adopt a provider-adapter architecture for Radium Media** — why the seam is
    at the adapter and not inside the worker (§3.3).
 2. **Media contract v2 uses declarative parameter schemas with an open task
    vocabulary** — what is gained, what exhaustiveness is given up (§4.1–§4.2).
@@ -1827,7 +1827,7 @@ Named explicitly so they are not smuggled in:
 - Training, fine-tuning, or LoRA management beyond passing a declared parameter.
 - Any change to Chat, Agent, model providers, or `:1337/v1`.
 - Any change to the Windows frameless shell.
-- Rebuilding the Atomic Media Worker (out-of-repo, per the 2026-08-24 spec).
+- Rebuilding the Radium Media Worker (out-of-repo, per the 2026-08-24 spec).
 - Reviving Atomic Code in any form — the guard's forbidden-path and
   forbidden-text checks stay exactly as they are.
 - Video post-processing: no trim, concat, transcode, or audio muxing.
@@ -1875,7 +1875,7 @@ of service, and content-policy surfaces. Answering "local-only" removes Task 6
 and ADR 7 cleanly and costs nothing downstream — the adapter seam still exists
 and a remote adapter can be added later.
 
-**Q3 — Should Atomic Chat supervise the worker process?**
+**Q3 — Should Radium Chat supervise the worker process?**
 Today the user starts it by hand. Supervision (Task 9) is a real usability win
 and a real increase in surface area — process lifecycle, crash loops, port
 conflicts, and an install story for the worker's Python environment. Default-off

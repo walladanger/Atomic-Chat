@@ -5,7 +5,7 @@ title: "Pin backend artifacts to verified tags"
 
 # 2026-07-28 — Pin backend artifacts to verified tags
 
-- **Context:** Atomic Chat builds process arguments against specific
+- **Context:** Radium Chat builds process arguments against specific
   TurboQuant llama.cpp, upstream llama.cpp, and AtomicBot MLX capabilities.
   Following a moving latest release can silently remove flags, introduce new
   asset names, or expose fork-only options to the wrong provider.

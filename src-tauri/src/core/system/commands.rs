@@ -392,7 +392,7 @@ fn detect_windows_installer_type() -> String {
     use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
     use winreg::RegKey;
 
-    const PRODUCT: &str = "Atomic Chat";
+    const PRODUCT: &str = "Radium Chat";
     const UNINSTALL: &str = "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
 
     // NSIS (setup.exe) writes its uninstall key named after the product.
@@ -616,14 +616,14 @@ pub struct CliInstallStatus {
 /// Name of the CLI command as it is installed on the user's PATH.
 pub const CLI_COMMAND_NAME: &str = "atomic-chat-cli";
 
-/// Name the CLI shipped under before the Atomic Chat rebrand. Older builds
+/// Name the CLI shipped under before the Radium Chat rebrand. Older builds
 /// installed it as plain `jan`, which collides with the unrelated Jan.ai CLI.
 const LEGACY_CLI_COMMAND_NAME: &str = "jan";
 
-/// Marker string embedded in every Atomic Chat CLI build. Used to confirm that a
+/// Marker string embedded in every Radium Chat CLI build. Used to confirm that a
 /// leftover `jan` binary on PATH was written by us before we remove it — a `jan`
 /// belonging to the actual Jan.ai app must never be touched.
-const CLI_OWNERSHIP_MARKER: &[u8] = b"Atomic Chat";
+const CLI_OWNERSHIP_MARKER: &[u8] = b"Radium Chat";
 
 /// Return true when `path` is a binary we shipped (contains [`CLI_OWNERSHIP_MARKER`]).
 fn is_our_cli_binary(path: &std::path::Path) -> bool {
@@ -670,13 +670,13 @@ fn remove_legacy_cli_binary(dir: &std::path::Path) {
     }
     if !is_our_cli_binary(&legacy) {
         log::info!(
-            "Leaving {} alone — not an Atomic Chat binary",
+            "Leaving {} alone — not an Radium Chat binary",
             legacy.display()
         );
         return;
     }
     match std::fs::remove_file(&legacy) {
-        Ok(()) => log::info!("Removed legacy Atomic Chat CLI at {}", legacy.display()),
+        Ok(()) => log::info!("Removed legacy Radium Chat CLI at {}", legacy.display()),
         Err(e) => log::warn!("Could not remove {}: {}", legacy.display(), e),
     }
 }
@@ -751,7 +751,7 @@ pub fn install_jan_cli_sync<R: Runtime>(
     let dest = resource_bin_dir.join(dest_bin_name);
 
     if !bundled.exists() && !dest.exists() {
-        return Err("Atomic Chat CLI binary not bundled with this version of the app.".to_string());
+        return Err("Radium Chat CLI binary not bundled with this version of the app.".to_string());
     }
 
     #[cfg(windows)]
@@ -831,7 +831,7 @@ pub fn uninstall_jan_cli() -> Result<(), String> {
         if dest.exists() {
             std::fs::remove_file(&dest).map_err(|e| {
                 format!(
-                    "Failed to remove the Atomic Chat CLI from {}: {}",
+                    "Failed to remove the Radium Chat CLI from {}: {}",
                     dest.display(),
                     e
                 )
@@ -967,7 +967,7 @@ fn jan_cli_bin_dir_windows() -> Result<PathBuf, String> {
         std::env::var("LOCALAPPDATA").map_err(|_| "Cannot determine LOCALAPPDATA".to_string())?;
     Ok(PathBuf::from(local_app_data)
         .join("Programs")
-        .join("Atomic Chat")
+        .join("Radium Chat")
         .join("resources")
         .join("bin"))
 }
@@ -1383,7 +1383,7 @@ custom_providers: []
 ///
 /// On Windows the native installer (`install.ps1`) sets `HERMES_HOME` via
 /// `[Environment]::SetEnvironmentVariable(..., "User")` -- a registry write
-/// that is invisible to Atomic Chat's own already-running process (which only
+/// that is invisible to Radium Chat's own already-running process (which only
 /// sees the environment block snapshotted at its own startup). So
 /// `std::env::var("HERMES_HOME")` can be stale within the same app session
 /// that just installed Hermes. Reading the registry value directly first
@@ -1688,8 +1688,8 @@ fn upsert_provider_request_timeout(content: &str, provider_id: &str, seconds: u3
 // External coding-agent / assistant integrations (Launch page)
 // ---------------------------------------------------------------------------
 
-const ATOMIC_MANAGED_BEGIN: &str = "# >>> Atomic Chat (managed) >>>";
-const ATOMIC_MANAGED_END: &str = "# <<< Atomic Chat (managed) <<<";
+const ATOMIC_MANAGED_BEGIN: &str = "# >>> Radium Chat (managed) >>>";
+const ATOMIC_MANAGED_END: &str = "# <<< Radium Chat (managed) <<<";
 
 /// Resolve the user's home directory in a platform-aware way.
 fn agent_home_dir() -> Result<String, String> {
@@ -1700,7 +1700,7 @@ fn agent_home_dir() -> Result<String, String> {
     }
 }
 
-/// Remove every previously written `# >>> Atomic Chat (managed) >>> ... <<<`
+/// Remove every previously written `# >>> Radium Chat (managed) >>> ... <<<`
 /// block. Some agents (e.g. Codex) need two managed regions — a root-level
 /// activation key at the very top of the file and a tables block at the
 /// bottom — so this strips them all, not just the first.
@@ -2502,7 +2502,7 @@ pub async fn install_agent<R: Runtime>(
             return Err(format!(
                 "'{}' is required to install this agent but was not found on PATH. \
                  Install it (Node.js from https://nodejs.org for npm-based agents), \
-                 then restart Atomic Chat and try again: {}",
+                 then restart Radium Chat and try again: {}",
                 prereq, docs
             ));
         }
@@ -2713,7 +2713,7 @@ pub fn configure_opencode(
         "atomic".to_string(),
         serde_json::json!({
             "npm": "@ai-sdk/openai-compatible",
-            "name": "Atomic Chat",
+            "name": "Radium Chat",
             "options": { "baseURL": api_url, "apiKey": key_val },
             "models": serde_json::Value::Object(models),
         }),
@@ -2745,7 +2745,7 @@ fn openclaude_global_config_path(home: &str) -> PathBuf {
 /// (`~/.openclaude/.openclaude-profile.json`). OpenClaude explicitly does not
 /// read `~/.claude` / `~/.claude.json` (see its README's "OpenClaude config
 /// cutover" section), so there is no legacy path to fall back to. OpenClaude
-/// routes atomic-chat through its OpenAI-compatible shim; local Atomic Chat
+/// routes atomic-chat through its OpenAI-compatible shim; local Radium Chat
 /// needs no API key.
 #[tauri::command]
 pub fn configure_openclaude(
@@ -2784,7 +2784,7 @@ pub fn configure_openclaude(
 
     let profile_entry = serde_json::json!({
         "id": OPENCLAUDE_ATOMIC_PROFILE_ID,
-        "name": "Atomic Chat",
+        "name": "Radium Chat",
         "provider": "atomic-chat",
         "baseUrl": api_url,
         "model": model,
@@ -2894,7 +2894,7 @@ pub fn configure_mimo(
         "atomic".to_string(),
         serde_json::json!({
             "npm": "@ai-sdk/openai-compatible",
-            "name": "Atomic Chat",
+            "name": "Radium Chat",
             "options": { "baseURL": api_url, "apiKey": key_val },
             "models": serde_json::Value::Object(models),
         }),
@@ -2925,7 +2925,7 @@ pub fn configure_droid(
     model: String,
     api_key: Option<String>,
 ) -> Result<(), String> {
-    const DISPLAY_NAME: &str = "Atomic Chat";
+    const DISPLAY_NAME: &str = "Radium Chat";
 
     let home = agent_home_dir()?;
     let dir = PathBuf::from(&home).join(".factory");
@@ -3011,10 +3011,10 @@ pub fn configure_droid(
 }
 
 /// Display name (and provider id) of the custom provider we register in Zed.
-const ZED_PROVIDER_ID: &str = "Atomic Chat";
+const ZED_PROVIDER_ID: &str = "Radium Chat";
 
 /// Configure Zed by upserting a custom OpenAI-compatible provider named
-/// "Atomic Chat" under `language_models.openai_compatible` in
+/// "Radium Chat" under `language_models.openai_compatible` in
 /// `~/.config/zed/settings.json`, and (when a model is running) selecting it as
 /// the agent's default model.
 ///
@@ -3327,7 +3327,7 @@ pub fn configure_openclaw(
 }
 
 /// Configure Claude Code by upserting `~/.claude/settings.json` so it points at
-/// the local Atomic Chat server and uses the active model. Values go into the
+/// the local Radium Chat server and uses the active model. Values go into the
 /// `env` block — Claude reads it at startup regardless of how `claude` was
 /// launched, and `ANTHROPIC_MODEL` there overrides any stale top-level `model`.
 /// All other user settings are preserved.
@@ -3479,7 +3479,7 @@ pub fn copilot_env_vars(
     env_vars
 }
 
-/// Configure GitHub Copilot CLI to use the local Atomic Chat server via its BYOK
+/// Configure GitHub Copilot CLI to use the local Radium Chat server via its BYOK
 /// environment variables. Copilot has no provider config file — it reads these
 /// from the environment at launch — so we persist them to the user's shell rc
 /// (Windows: `setx`). The auto-opened terminal then sources them. `COPILOT_OFFLINE`
@@ -3492,7 +3492,7 @@ pub fn configure_copilot(
 ) -> Result<(), String> {
     let env_vars = copilot_env_vars(&api_url, &model, api_key.as_deref());
 
-    const MARKER: &str = "# Atomic Chat - Copilot CLI Config";
+    const MARKER: &str = "# Radium Chat - Copilot CLI Config";
 
     if cfg!(target_os = "windows") {
         for (key, value) in &env_vars {
@@ -3700,7 +3700,7 @@ fn dsh_route_node(api_url: &str, model: &str, with_key: bool) -> serde_yaml::Val
     let mut route = Mapping::new();
     route.insert(
         ykey("displayName"),
-        Value::String("Atomic Chat".to_string()),
+        Value::String("Radium Chat".to_string()),
     );
     route.insert(ykey("api"), Value::String("openai-completions".to_string()));
     route.insert(ykey("baseURL"), Value::String(api_url.to_string()));
@@ -4026,7 +4026,7 @@ fn configure_dsh_at(
     Ok(())
 }
 
-/// Point DeepSeek Harness (`dsh`) at the local Atomic Chat server by upserting
+/// Point DeepSeek Harness (`dsh`) at the local Radium Chat server by upserting
 /// the `llm-pi-ai.providers.atomic` route in `$DSH_HOME/settings.yaml`
 /// (default `~/.dsh`). dsh re-reads that document live, so no restart is needed.
 ///
@@ -4074,7 +4074,7 @@ pub fn configure_goose(
 ) -> Result<(), String> {
     let env_vars = goose_env_vars(&api_url, &model, api_key.as_deref());
 
-    const MARKER: &str = "# Atomic Chat - Goose Config";
+    const MARKER: &str = "# Radium Chat - Goose Config";
 
     if cfg!(target_os = "windows") {
         for (key, value) in &env_vars {
@@ -4147,7 +4147,7 @@ pub fn configure_openhands(
 ) -> Result<(), String> {
     let env_vars = openhands_env_vars(&api_url, &model, api_key.as_deref());
 
-    const MARKER: &str = "# Atomic Chat - OpenHands Config";
+    const MARKER: &str = "# Radium Chat - OpenHands Config";
 
     if cfg!(target_os = "windows") {
         for (key, value) in &env_vars {
@@ -4242,7 +4242,7 @@ pub fn configure_kilo(
     provider.as_object_mut().unwrap().insert(
         "atomic".to_string(),
         serde_json::json!({
-            "name": "Atomic Chat",
+            "name": "Radium Chat",
             "npm": "@ai-sdk/openai-compatible",
             "options": { "baseURL": api_url, "apiKey": key_val },
             "models": serde_json::Value::Object(models),
@@ -4305,7 +4305,7 @@ pub fn configure_poolside(
     let standalone_base = poolside_standalone_base_url(&api_url);
     let env_vars = poolside_env_vars(&api_url, &model, api_key.as_deref());
 
-    const MARKER: &str = "# Atomic Chat - Poolside Config";
+    const MARKER: &str = "# Radium Chat - Poolside Config";
 
     if cfg!(target_os = "windows") {
         for (key, value) in &env_vars {
@@ -4804,7 +4804,7 @@ mod dsh_tests {
         let r = route(&root);
         assert_eq!(r.get("api").unwrap().as_str(), Some("openai-completions"));
         assert_eq!(r.get("baseURL").unwrap().as_str(), Some(URL));
-        assert_eq!(r.get("displayName").unwrap().as_str(), Some("Atomic Chat"));
+        assert_eq!(r.get("displayName").unwrap().as_str(), Some("Radium Chat"));
 
         // A hand-declared route is refused by dsh without a non-empty model list.
         let models = r.get("models").unwrap().as_sequence().unwrap();

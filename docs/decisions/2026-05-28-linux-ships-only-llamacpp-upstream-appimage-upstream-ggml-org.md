@@ -5,7 +5,7 @@ title: "Linux ships only `llamacpp-upstream` (AppImage, upstream `ggml-org/llama
 
 # 2026-05-28 — Linux ships only `llamacpp-upstream` (AppImage, upstream `ggml-org/llama.cpp`); Vulkan is the sole GPU path
 
-- **Context:** Atomic Chat had no Linux release channel at all — the only
+- **Context:** Radium Chat had no Linux release channel at all — the only
  supported targets were macOS (Universal) and Windows x64. The "Linux
  support" epic (Daniel, 2026-05-26) calls for closing that gap in two
  phases: Phase 1 is the mainstream `linux-x86_64` build for ordinary
@@ -72,7 +72,7 @@ title: "Linux ships only `llamacpp-upstream` (AppImage, upstream `ggml-org/llama
  but they are out of scope today.
  4. **Bundled-by-default: `linux-cpu-x64`.** Mirrors the Windows
  ADR — the installer ships exactly one llama-server build
- (the CPU one), so Atomic Chat is usable offline on first
+ (the CPU one), so Radium Chat is usable offline on first
  launch on any Linux box without a working GPU stack. The
  hardware-gated picker (`detectIdealBackendType`) auto-suggests
  `linux-vulkan-x64` when `tauri-plugin-hardware` reports a
@@ -134,9 +134,9 @@ title: "Linux ships only `llamacpp-upstream` (AppImage, upstream `ggml-org/llama
  Tauri updater now serves Linux clients on the same channel
  as macOS / Windows.
  9. **Rename collateral.** `tauri.linux.conf.json` title flips
- from `"Jan"` to `"Atomic Chat"`. `buildAppImage.sh` flips
+ from `"Jan"` to `"Radium Chat"`. `buildAppImage.sh` flips
  its hardcoded `Jan.AppDir` / `usr/lib/Jan/binaries` paths
- to the matching `Atomic Chat` paths produced by the new
+ to the matching `Radium Chat` paths produced by the new
  product name. `web-app/src/lib/utils.ts`'s `LOCAL_LLAMACPP_PROVIDER`
  / `LOCAL_LLAMACPP_EXTENSION_NAME` switches from
  `IS_WINDOWS ? upstream : turboquant` to
@@ -228,7 +228,7 @@ title: "Linux ships only `llamacpp-upstream` (AppImage, upstream `ggml-org/llama
  *Windows ships only `llamacpp-upstream`*, the 2026-05-19 ADRs
  *Use `AtomicBot-ai/atomic-llama-cpp-turboquant` as the LLM backend*
  and *Ship upstream `ggml-org/llama.cpp` as a second macOS provider*,
- the "Linux support for Atomic Chat" epic (Daniel, 2026-05-26),
+ the "Linux support for Radium Chat" epic (Daniel, 2026-05-26),
  [ggml-org/llama.cpp releases](https://github.com/ggml-org/llama.cpp/releases),
  files: [`src-tauri/tauri.linux.conf.json`](src-tauri/tauri.linux.conf.json),
  [`src-tauri/build-utils/buildAppImage.sh`](src-tauri/build-utils/buildAppImage.sh),

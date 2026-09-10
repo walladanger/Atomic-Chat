@@ -1,4 +1,4 @@
-# Atomic Chat Agent Architecture
+# Radium Chat Agent Architecture
 
 Living engineering reference for the autonomous Rust agent in this directory.
 Update this document when the agent loop, tool contract, safety policy, or
@@ -7,7 +7,7 @@ decision log in `AGENTS.md`.
 
 ## Status and scope
 
-The agent backend is isolated from regular Atomic Chat conversations and from
+The agent backend is isolated from regular Radium Chat conversations and from
 the Vercel AI SDK path. It talks directly to the active local llama.cpp session
 over native `/completion`.
 

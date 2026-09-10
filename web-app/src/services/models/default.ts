@@ -211,7 +211,7 @@ export class DefaultModelsService implements ModelsService {
   }
 
   async fetchModelCatalog(): Promise<ModelCatalog> {
-    // Primary source: the Atomic Chat curated catalog (`atomic-chat-model-catalog`
+    // Primary source: the Radium Chat curated catalog (`atomic-chat-model-catalog`
     // GitHub Releases) loaded via the registry abstraction so the same
     // localStorage cache + baseline fallback machinery is shared with
     // `useModelCatalogStore`. The loader never throws — on hard failure it

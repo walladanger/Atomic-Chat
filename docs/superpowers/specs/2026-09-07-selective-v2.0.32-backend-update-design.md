@@ -2,11 +2,11 @@
 
 ## Goal
 
-Update the Atomic Chat fork from its `v2.0.23` base toward upstream
+Update the Radium Chat fork from its `v2.0.23` base toward upstream
 `AtomicBot-ai/Atomic-Chat` tag `v2.0.32` by selecting backend and narrowly
 related configuration changes. Remove the fork's Atomic Code page, bundle the
 approved Windows CPU and CUDA 12.4 backend matrix for offline use, and preserve
-the Atomic Media workspace, branding, layout, user data, language support, and
+the Radium Media workspace, branding, layout, user data, language support, and
 unrelated dirty-worktree changes.
 
 ## Repository state and recovery
@@ -15,7 +15,7 @@ The working branch is `feature/atomic-code-foundation` at `d0b721443`. Its
 common ancestor with upstream `v2.0.32` is `9097a05f3` (`v2.0.23`). The fork is
 22 commits ahead of that base and upstream is 37 commits ahead on a separate
 line. A wholesale merge is prohibited because upstream deletes the fork's Code
-and Atomic Media files.
+and Radium Media files.
 
 Two recovery refs exist before tracked content is edited:
 
@@ -45,7 +45,7 @@ of truth unless a named feature requires a compatible extension.
 ## Protected surfaces
 
 The user's later instruction to remove Atomic Code supersedes the original
-Code-page immutability requirement. The following Atomic Media files remain
+Code-page immutability requirement. The following Radium Media files remain
 immutable and will be checked by SHA-256 before the final commit:
 
 - `web-app/src/containers/media/MediaGenerationForm.tsx`
@@ -62,8 +62,8 @@ immutable and will be checked by SHA-256 before the final commit:
 
 Shared registration files may be edited only when required to register a new
 backend command or plugin, remove Atomic Code, or add the narrowly approved
-configuration UI. Their Atomic Media registrations must remain byte-for-byte
-equivalent at the relevant declarations. No Atomic Media component, route,
+configuration UI. Their Radium Media registrations must remain byte-for-byte
+equivalent at the relevant declarations. No Radium Media component, route,
 layout, generation request, or visual behavior may change.
 
 ## Atomic Code removal
@@ -78,15 +78,15 @@ Remove the Atomic Code page and its complete page-specific dependency graph:
   index entry.
 
 Mixed shared files must be edited surgically. Preserve chat and Agent Mode
-switching, the Atomic Media workspace entry, generic code-block rendering, the
+switching, the Radium Media workspace entry, generic code-block rendering, the
 Launch page's external coding-agent integrations, and Agent Mode's backend
-workspace/indexing tools. Files in the protected Atomic Media list remain
+workspace/indexing tools. Files in the protected Radium Media list remain
 unchanged even if they were edited in the original Atomic Code foundation
 commit, because their current changes are type-safety or route-generation
 adjustments rather than Atomic Code behavior.
 
 Add a route/navigation regression test proving that `/code` and its workspace
-entry are absent while chat, Agent Mode, and Atomic Media remain reachable.
+entry are absent while chat, Agent Mode, and Radium Media remain reachable.
 
 ## Bundled Windows backend matrix
 
@@ -149,7 +149,7 @@ MLX detection, and supported weight filenames remain unchanged.
 
 Before spawning a stdio MCP server, normalize and validate its configured
 working directory. On Windows, an empty, missing, non-directory, or otherwise
-unusable path falls back to Atomic Chat's existing per-user MCP filesystem
+unusable path falls back to Radium Chat's existing per-user MCP filesystem
 sandbox. If that sandbox cannot be created, fall back to the application's data
 directory. Emit a warning that identifies the invalid configured directory and
 the chosen fallback without exposing secrets.
@@ -180,7 +180,7 @@ aggregate-size, regular-file, and trusted-root limits before copying bytes.
 ## Agent Mode runtime
 
 Port runtime Agent Mode functionality that is independent of the Code and
-Atomic Media pages:
+Radium Media pages:
 
 - target abstraction for llama.cpp, MLX, OpenAI-compatible cloud providers,
   and the ChatGPT subscription;
@@ -199,7 +199,7 @@ Atomic Code page: it must not import, call, register, or recreate any frontend
 Code route, workspace, or model router.
 
 Exclude GAIA evaluation additions, benchmark-only behavior, Code-page UI and
-routes, Atomic Media generation integration, Launch-page additions, API-page
+routes, Radium Media generation integration, Launch-page additions, API-page
 redesigns, sidebar redesigns, and unrelated assistant-layout changes.
 
 Minimal frontend glue is limited to the chat composer and existing thread
@@ -296,7 +296,7 @@ The final verification gate includes:
 - `cargo check` and `cargo clippy` for the Windows desktop feature set;
 - the repository's `make verify` equivalent available on Windows;
 - a Windows release/build check as far as local signing credentials permit;
-- a final Atomic Media protected-file hash comparison;
+- a final Radium Media protected-file hash comparison;
 - a final search proving the Atomic Code page, route, sidebar entry, model
   router, and Code-only documentation are absent;
 - a final dirty-delta comparison confirming the user's four original changes

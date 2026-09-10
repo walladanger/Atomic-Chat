@@ -42,7 +42,7 @@ const v1Model = v1.models?.[0]
 
 const descriptor: MediaProviderDescriptor = {
   id: PROVIDER,
-  label: 'Atomic Media Worker',
+  label: 'Radium Media Worker',
   kind: 'local_worker',
   adapter: 'atomic-media-worker',
   enabled: true,

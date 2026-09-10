@@ -6,7 +6,7 @@ title: "Force greedy sampling for `llamacpp-upstream` DFlash requests"
 # 2026-07-13 — Force greedy sampling for `llamacpp-upstream` DFlash requests
 
 - **Context:** DFlash speculative decoding on the upstream llama.cpp provider
-  requires deterministic target sampling, while Atomic Chat's global sampling
+  requires deterministic target sampling, while Radium Chat's global sampling
   defaults include a non-zero temperature.
 - **Decision:** At request construction, when the selected provider is
   `llamacpp-upstream` and its DFlash setting is enabled, override only the

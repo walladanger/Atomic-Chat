@@ -26,12 +26,12 @@ title: "Add Pi, Goose, OpenHands, and KiloCode as one-click Launch-page coding a
     (upsert `providers.atomic`) and `settings.json` (`defaultProvider`/
     `defaultModel`); `endpointWithPrefix` true. Terminal: `pi`.
   - **Goose** (`configure_goose`): env-var agent via `write_marked_env_to_shell`
-    / `setx` (marker `# Atomic Chat - Goose Config`, prefix `GOOSE_`):
+    / `setx` (marker `# Radium Chat - Goose Config`, prefix `GOOSE_`):
     `GOOSE_PROVIDER=openai`, `GOOSE_MODEL`, `OPENAI_HOST` (bare host:port —
     `endpointWithPrefix` false), `OPENAI_BASE_PATH=v1/chat/completions`,
     `OPENAI_API_KEY`. Terminal: `goose session`.
   - **OpenHands** (`configure_openhands`): env-var agent (marker
-    `# Atomic Chat - OpenHands Config`, prefix `LLM_`): `LLM_MODEL=openai/<model>`
+    `# Radium Chat - OpenHands Config`, prefix `LLM_`): `LLM_MODEL=openai/<model>`
     (litellm prefix required), `LLM_BASE_URL` (`/v1`), `LLM_API_KEY`. Read only
     with `--override-with-envs`. Terminal: `openhands --override-with-envs`.
   - **KiloCode** (`configure_kilo`): json5 parse + strict-JSON re-serialize of

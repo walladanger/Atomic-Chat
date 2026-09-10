@@ -51,7 +51,7 @@ export function MediaPreview({ asset }: MediaPreviewProps) {
             Generation preview
           </p>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            Your finished image or video will appear here without leaving Atomic
+            Your finished image or video will appear here without leaving Radium
             Chat.
           </p>
         </div>

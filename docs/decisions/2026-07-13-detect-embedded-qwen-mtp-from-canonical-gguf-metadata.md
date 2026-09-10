@@ -6,7 +6,7 @@ title: "Detect embedded Qwen MTP from canonical GGUF metadata"
 # 2026-07-13 — Detect embedded Qwen MTP from canonical GGUF metadata
 
 - **Context:** The `llamacpp-upstream` load and Settings gates treated a Qwen
-  model as built-in MTP-capable only when its Atomic Chat model id contained
+  model as built-in MTP-capable only when its Radium Chat model id contained
   `mtp`. Valid combined GGUFs can be imported under ordinary filenames, so
   their embedded MTP head was silently disabled despite the file carrying the
   metadata llama.cpp itself uses.

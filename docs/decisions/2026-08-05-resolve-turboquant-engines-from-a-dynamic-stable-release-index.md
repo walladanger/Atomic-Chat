@@ -10,7 +10,7 @@ title: "Resolve TurboQuant engines from a dynamic stable-release index instead o
   `extensions/llamacpp-extension/src/backend.ts`, and duplicated in `Makefile`,
   `.github/workflows/release.yml`, `scripts/dev-windows.ps1` and the test
   fixtures. Shipping a new engine release therefore took a conf PR *and* an
-  Atomic Chat release, and macOS could not update its engine at all
+  Radium Chat release, and macOS could not update its engine at all
   (`fetchRemoteBackends`, `reconcileBackendReleaseTag` and the auto-download in
   `ensureBackendReady` all bailed out early on non-Windows/Linux). Two further
   gaps: the fork publishes `dev-latest` and the legacy `turboquant-<id>-<sha>`
@@ -33,7 +33,7 @@ title: "Resolve TurboQuant engines from a dynamic stable-release index instead o
   of the same type". On first run with no user choice, the hardware-optimal
   variant is fetched immediately while the bundled build keeps serving.
 - **Consequences:** Publishing an engine release now reaches every user,
-  including macOS, without an Atomic Chat release or a conf edit; the dropdown
+  including macOS, without an Radium Chat release or a conf edit; the dropdown
   labels releases by accelerator family and highlights rather than by archive id.
   The costs are deliberate: a clean install on a discrete-NVIDIA host starts a
   several-hundred-megabyte CUDA download unasked (which the next stage's

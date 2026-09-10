@@ -61,7 +61,7 @@ export const defaultAssistant: Assistant = {
   },
   avatar: '/images/transparent-logo.png',
   description:
-    "Atomic Chat is a helpful desktop assistant that can reason through complex tasks and use tools to complete them on the user's behalf.",
+    "Radium Chat is a helpful desktop assistant that can reason through complex tasks and use tools to complete them on the user's behalf.",
   instructions: 'Current date: {{current_date}}',
 }
 
