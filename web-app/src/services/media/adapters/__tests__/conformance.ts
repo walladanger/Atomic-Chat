@@ -50,8 +50,22 @@ export type ConformanceScenarios = {
   /**
    * Successive polls report these states in order, repeating the last one. When
    * the final state is `failed` the provider also reports a reason.
+   *
+   * For a synchronous provider this configures the outcome of the *submit*,
+   * because that is where the work happens; the suite calls it before
+   * submitting in that case.
    */
   jobStates(states: MediaJobState[]): void
+  /**
+   * Return `true` to declare that this provider produces its result in the
+   * submit response and has no job to query afterwards - `features.synchronous`.
+   *
+   * Declared, not inferred, and following the same pattern as `unauthorised`:
+   * the tests that cannot apply then assert the declaration itself rather than
+   * silently passing. Optional, so an adapter written before this existed is
+   * still treated as job-based.
+   */
+  synchronous?(): boolean
   /** The `AbortSignal` the transport received on the most recent call. */
   lastSignal(): AbortSignal | undefined
   /** How many transport calls have been made since the last reset. */
@@ -65,6 +79,12 @@ export type ConformanceHarness = {
   createAdapter: (descriptor: MediaProviderDescriptor) => MediaProviderAdapter
   scenarios: ConformanceScenarios
 }
+
+const TERMINAL: ReadonlySet<MediaJobState> = new Set<MediaJobState>([
+  'succeeded',
+  'failed',
+  'cancelled',
+])
 
 const CLIENT_JOB_ID = '01JCONFORMANCEJOBID00000'
 const PROVIDER_JOB_ID = 'provider-job-1'
@@ -101,6 +121,7 @@ async function requestFrom(
 export function describeMediaAdapterConformance(harness: ConformanceHarness) {
   const { name, descriptor, createAdapter, scenarios } = harness
   const adapter = () => createAdapter(descriptor)
+  const isSynchronous = () => scenarios.synchronous?.() === true
 
   describe(`${name} — adapter conformance`, () => {
     describe('descriptor', () => {
@@ -214,6 +235,24 @@ export function describeMediaAdapterConformance(harness: ConformanceHarness) {
         scenarios.acceptsSubmit(PROVIDER_JOB_ID)
         const submitted = await instance.submit(request)
 
+        if (isSynchronous()) {
+          // Declared inapplicable: there is no job to query, so there is no
+          // progression to observe. What must still hold is that the caller can
+          // reach a terminal state through poll without knowing that, and that
+          // the provider is honest about having no queue.
+          const capabilities = await instance.capabilities()
+          expect(capabilities.features?.synchronous).toBe(true)
+          expect(capabilities.features?.queue ?? false).toBe(false)
+
+          let settled: MediaJobSnapshot = await instance.poll(submitted)
+          for (let i = 0; i < 5 && !TERMINAL.has(settled.state); i += 1) {
+            settled = await instance.poll(submitted)
+          }
+          expect(TERMINAL.has(settled.state)).toBe(true)
+          expect(settled.client_job_id).toBe(request.client_job_id)
+          return
+        }
+
         scenarios.jobStates(['queued', 'running', 'succeeded'])
 
         const states: MediaJobState[] = []
@@ -230,10 +269,18 @@ export function describeMediaAdapterConformance(harness: ConformanceHarness) {
         const instance = adapter()
         const request = await requestFrom(instance, scenarios)
         scenarios.acceptsSubmit(PROVIDER_JOB_ID)
-        const submitted = await instance.submit(request)
 
-        scenarios.jobStates(['failed'])
-        const snapshot = await instance.poll(submitted)
+        // A synchronous provider decides the outcome at submit, so the failure
+        // has to be arranged before it. The assertions below are identical
+        // either way - only when the failure is configured differs.
+        if (isSynchronous()) scenarios.jobStates(['failed'])
+        const submitted = await instance.submit(request)
+        if (!isSynchronous()) scenarios.jobStates(['failed'])
+
+        let snapshot = await instance.poll(submitted)
+        for (let i = 0; i < 5 && !TERMINAL.has(snapshot.state); i += 1) {
+          snapshot = await instance.poll(submitted)
+        }
 
         expect(snapshot.state).toBe('failed')
         expect(snapshot.error).toBeTruthy()
@@ -314,6 +361,16 @@ export function describeMediaAdapterConformance(harness: ConformanceHarness) {
         const submitted = await instance.submit(request)
         scenarios.jobStates(['running'])
         const controller = new AbortController()
+
+        if (isSynchronous()) {
+          // Declared inapplicable: there is nothing to abort, because poll makes
+          // no request. Asserted rather than skipped - a synchronous poll that
+          // DID reach the network would generate, and charge, twice.
+          const before = scenarios.callCount()
+          await instance.poll(submitted, controller.signal)
+          expect(scenarios.callCount()).toBe(before)
+          return
+        }
 
         await instance.poll(submitted, controller.signal)
 

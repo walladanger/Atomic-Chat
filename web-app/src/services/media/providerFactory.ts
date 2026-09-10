@@ -9,6 +9,7 @@
 
 import { createAtomicWorkerAdapter } from './adapters/atomicWorker'
 import { createComfyUiAdapter } from './adapters/comfyui'
+import { createRemoteHttpAdapter } from './adapters/remoteHttp'
 import type { MediaProviderAdapter, MediaProviderDescriptor } from './contract'
 
 export class UnknownMediaAdapterError extends Error {
@@ -29,7 +30,12 @@ export function createMediaAdapter(
       return createAtomicWorkerAdapter(descriptor)
     case 'comfyui':
       return createComfyUiAdapter(descriptor)
-    // 'openai-images' / 'custom-http' arrive in Task 6.
+    case 'openai-images':
+    case 'custom-http':
+      // No secret resolver is wired yet: the OS credential store approved in
+      // D3/Q5 is follow-on work. Until it lands, a cloud provider reports
+      // unauthorised rather than silently sending a blank Authorization header.
+      return createRemoteHttpAdapter(descriptor)
     default:
       // Thrown rather than returning a null adapter: a provider configured
       // against an adapter this build does not have is a state the settings UI

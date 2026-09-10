@@ -308,6 +308,10 @@ const scenarios: ConformanceScenarios = {
   jobStates(states: MediaJobState[]) {
     state.states = [...states]
   },
+  synchronous() {
+    // Job-based: ComfyUI queues a prompt and is polled through /history.
+    return false
+  },
   lastSignal() {
     return state.lastSignal
   },

@@ -125,6 +125,10 @@ const scenarios: ConformanceScenarios = {
   jobStates(states: MediaJobState[]) {
     state.states = [...states]
   },
+  synchronous() {
+    // Job-based: the worker creates a job and is polled for it.
+    return false
+  },
   lastSignal() {
     return state.lastSignal
   },

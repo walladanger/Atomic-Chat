@@ -94,6 +94,24 @@ export type MediaProviderFeatures = {
   events?: boolean
   install?: boolean
   batch?: boolean
+  /**
+   * The provider produces its result in the submit response rather than
+   * creating a job that can be queried afterwards - an OpenAI-compatible
+   * images endpoint, for example.
+   *
+   * The rest of the contract still applies: `submit` returns a live snapshot
+   * and `poll` reports the outcome, because the caller must not have to know
+   * which kind of provider it is holding. What changes is what `poll` *is*.
+   * For a job-based provider it is a request; for a synchronous one it reads
+   * a result that has already been paid for, and must never reach the network
+   * again - a second request would generate, and charge, twice.
+   *
+   * Declared rather than inferred: a provider with no queue is not necessarily
+   * synchronous, and the conformance suite has to know which of the two kinds
+   * of `poll` it is testing. Discovered by the third adapter; see the tracker's
+   * decision D7.
+   */
+  synchronous?: boolean
 }
 
 export type MediaCapabilities = {
