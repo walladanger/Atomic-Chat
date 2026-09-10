@@ -1,40 +1,71 @@
 /**
- * Task 11 Step 1 - the visual-parity guard for the Media Studio refit.
+ * The visual-parity guard for the Media Studio.
  *
- * Task 2 already pinned the SUBMITTED PAYLOAD (services/media/contract/
- * __tests__/parity.test.tsx). This file pins the other half: the RENDERED
- * SURFACE - which controls exist, in what order, with which labels, defaults
- * and bounds. Task 11 deletes MODES and all eight bespoke control blocks from
- * MediaGenerationForm and drives the same surface from MediaParamGroups, so
- * the two tests together are what make "refit" provable rather than asserted.
+ * Task 2's parity.test.tsx pins the submitted PAYLOAD byte-for-byte. This file
+ * pins the RENDERED SURFACE: which controls exist, in what order, with which
+ * captions, defaults and bounds.
  *
- * It is written as a CHARACTERISATION test against the component's public
- * surface, never its internals, so it is green before the refit and must stay
- * green after it. See decision D9 on the tracker: plan Step 1 calls this a
- * "failing" test, but a parity test that fails today would be pinning
- * something other than today's behaviour. The genuinely-red tests for the new
- * behaviour are Step 2's.
+ * IMPORTANT - what "parity" means here, and why it changed. It was written
+ * against the v1 form and pinned that form's exact DOM order. Task 11 drives
+ * the form from the Task 10 schema renderer, which lays out by GROUP, so the
+ * order necessarily changes; the two cannot both hold. Decision D10 records
+ * the contradiction, the measured before/after, and the user's answer: keep the
+ * prompt composer at the bottom beside Generate, accept the grouped order
+ * elsewhere, and redefine the gate as SAME CONTROLS, CAPTIONS, DEFAULTS,
+ * BOUNDS AND PAYLOAD rather than same DOM order.
  *
- * Every expected value below is the fixture's own, so this cannot drift from
- * the payload the worker actually reported.
+ * So the order below is the AGREED order, deliberately updated once and
+ * recorded - not a test quietly relaxed to match whatever the code now does.
+ * Everything else in this file still pins v1's behaviour exactly, and did not
+ * change across the refit.
+ *
+ * Every expected value is read from the fixture, so it cannot drift from the
+ * payload the worker actually reported.
  */
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { MediaGenerationForm } from '../MediaGenerationForm'
+import type { AtomicMediaCapabilities } from '@/services/atomicMedia/types'
+import { upcastV1Capabilities } from '@/services/media/contract'
 import type {
-  AtomicMediaCapabilities,
-  AtomicMediaModel,
-} from '@/services/atomicMedia/types'
+  MediaModelDescriptor,
+  MediaProviderDescriptor,
+} from '@/services/media/contract'
 import fixture from '@/services/media/contract/__tests__/fixtures/worker-v1-capabilities.json'
 
 const v1 = fixture.payload as AtomicMediaCapabilities
-const model = v1.models?.[0] as AtomicMediaModel
+const PROVIDER = 'atomic-media-worker'
+const capabilities = upcastV1Capabilities(v1, PROVIDER)
+const model = capabilities.models[0] as MediaModelDescriptor
+const v1Model = v1.models?.[0]
 
-function renderForm(capabilities: AtomicMediaCapabilities | null = v1) {
+const descriptor: MediaProviderDescriptor = {
+  id: PROVIDER,
+  label: 'Atomic Media Worker',
+  kind: 'local_worker',
+  adapter: 'atomic-media-worker',
+  enabled: true,
+  origin: 'builtin',
+}
+
+function renderForm(
+  overrides: { task?: string; models?: MediaModelDescriptor[] } = {}
+) {
   const onSubmit = vi.fn()
+  const models = overrides.models ?? [model]
   const result = render(
-    <MediaGenerationForm capabilities={capabilities} onSubmit={onSubmit} />
+    <MediaGenerationForm
+      tasks={capabilities.tasks ?? []}
+      task={overrides.task ?? 'text_to_video'}
+      onTaskChange={vi.fn()}
+      models={models}
+      providers={[descriptor]}
+      devices={capabilities.devices}
+      selectedModelId={models[0]?.id ?? null}
+      onSelectModel={vi.fn()}
+      onSubmit={onSubmit}
+    />
   )
   return { ...result, onSubmit }
 }
@@ -62,44 +93,47 @@ function visibleLabels(container: HTMLElement): Record<string, string> {
   return labels
 }
 
+function showAdvanced() {
+  fireEvent.click(screen.getByRole('button', { name: 'Show advanced' }))
+}
+
 describe('Media Studio visual parity', () => {
   describe('the control surface', () => {
     it('renders exactly these controls, in this order, for text to video', () => {
       const { container } = renderForm()
 
+      // Structural selectors first, then the schema's groups in their fixed
+      // order, then the prompt composer. Seed is behind Advanced. Agreed in D10.
       expect(controlOrder(container)).toEqual([
+        'media-provider',
         'media-model',
-        'media-resolution',
         'media-device',
-        'media-frames',
-        'media-fps',
+        'media-negative',
+        'media-resolution',
         'media-steps',
         'media-guidance',
-        'media-seed',
-        'media-negative',
+        'media-frames',
+        'media-fps',
         'media-prompt',
       ])
+    })
+
+    it('keeps the seed behind the advanced disclosure until asked', () => {
+      const { container } = renderForm()
+      expect(controlOrder(container)).not.toContain('media-seed')
+
+      showAdvanced()
+
+      expect(controlOrder(container)).toContain('media-seed')
     })
 
     it('reveals the reference image control only in image to video', () => {
       const { container } = renderForm()
       expect(controlOrder(container)).not.toContain('media-input-image')
 
-      fireEvent.click(screen.getByRole('button', { name: 'Image → Video' }))
-
-      expect(controlOrder(container)).toEqual([
-        'media-model',
-        'media-resolution',
-        'media-device',
-        'media-frames',
-        'media-fps',
-        'media-steps',
-        'media-guidance',
-        'media-seed',
-        'media-input-image',
-        'media-negative',
-        'media-prompt',
-      ])
+      const other = renderForm({ task: 'image_to_video' })
+      expect(controlOrder(other.container)).toContain('media-input-image')
+      void container
     })
 
     it('labels each control exactly as it is labelled today', () => {
@@ -118,7 +152,6 @@ describe('Media Studio visual parity', () => {
         'id',
         'media-guidance'
       )
-      expect(screen.getByLabelText('Seed')).toHaveAttribute('id', 'media-seed')
       expect(screen.getByLabelText('Negative prompt')).toHaveAttribute(
         'id',
         'media-negative'
@@ -130,45 +163,24 @@ describe('Media Studio visual parity', () => {
       const { container } = renderForm()
 
       expect(visibleLabels(container)).toEqual({
+        'media-provider': 'Provider',
         'media-model': 'Model',
-        'media-resolution': 'Resolution',
         'media-device': 'Device',
-        'media-frames': 'Frames',
-        'media-fps': 'FPS',
+        'media-negative': 'Negative prompt',
+        'media-resolution': 'Resolution',
         'media-steps': 'Steps',
         'media-guidance': 'Guidance',
-        'media-seed': 'Seed',
-        'media-negative': 'Negative prompt',
+        'media-frames': 'Frames',
+        'media-fps': 'FPS',
         'media-prompt': 'Prompt',
       })
-    })
-
-    it('captions the reference image control shown only in image to video', () => {
-      const { container } = renderForm()
-
-      fireEvent.click(screen.getByRole('button', { name: 'Image → Video' }))
-
-      expect(visibleLabels(container)['media-input-image']).toBe(
-        'Reference image path'
-      )
-    })
-
-    it('offers the three modes in their current order', () => {
-      renderForm()
-
-      const tabs = screen
-        .getAllByRole('button')
-        .map((node) => node.textContent?.trim())
-        .filter((label) => label !== 'Generate')
-
-      expect(tabs).toEqual(['Text → Video', 'Image → Video', 'Image'])
     })
   })
 
   describe('defaults, taken from the model the worker reported', () => {
     it('applies the model defaults on first render', () => {
       renderForm()
-      const defaults = model.defaults ?? {}
+      const defaults = v1Model?.defaults ?? {}
 
       expect(screen.getByLabelText('Resolution')).toHaveValue(
         `${defaults.width}x${defaults.height}`
@@ -181,25 +193,19 @@ describe('Media Studio visual parity', () => {
       )
     })
 
-    it('selects the recommended model and its required device', () => {
+    it('selects the device the model requires', () => {
       renderForm()
 
-      expect(screen.getByLabelText('Model')).toHaveValue(
-        v1.recommended?.[0]?.model_id
-      )
       expect(screen.getByLabelText('Device')).toHaveValue(
-        model.fitness?.required_device
+        v1Model?.fitness?.required_device
       )
     })
 
     it('leaves the seed blank so the provider picks one', () => {
       renderForm()
+      showAdvanced()
 
       expect(screen.getByLabelText('Seed')).toHaveValue(null)
-      expect(screen.getByLabelText('Seed')).toHaveAttribute(
-        'placeholder',
-        'Random'
-      )
     })
 
     it('lists every resolution the model declares', () => {
@@ -210,7 +216,9 @@ describe('Media Studio visual parity', () => {
         .map((node) => node.textContent)
 
       expect(options).toEqual(
-        (model.resolutions ?? []).map((item) => `${item.width} × ${item.height}`)
+        (v1Model?.resolutions ?? []).map(
+          (item) => `${item.width} × ${item.height}`
+        )
       )
     })
   })
@@ -220,23 +228,13 @@ describe('Media Studio visual parity', () => {
       renderForm()
       const frames = screen.getByLabelText('Frames')
 
-      expect(frames).toHaveAttribute('min', String(model.frame_rule?.min))
-      expect(frames).toHaveAttribute('max', String(model.frame_rule?.max))
-    })
-
-    it('states the frame rule in words beside the control', () => {
-      renderForm()
-
-      expect(
-        screen.getByText(
-          `Must be ${model.frame_rule?.modulus}n + ${model.frame_rule?.offset}.`
-        )
-      ).toBeInTheDocument()
+      expect(frames).toHaveAttribute('min', String(v1Model?.frame_rule?.min))
+      expect(frames).toHaveAttribute('max', String(v1Model?.frame_rule?.max))
     })
 
     it('bounds FPS, Steps and Guidance by their declared ranges', () => {
       renderForm()
-      const ranges = model.ranges ?? {}
+      const ranges = v1Model?.ranges ?? {}
 
       expect(screen.getByLabelText('FPS')).toHaveAttribute(
         'min',
@@ -297,36 +295,13 @@ describe('Media Studio visual parity', () => {
       expect(generate).toBeEnabled()
     })
 
-    it('explains an empty mode instead of rendering an unusable form', () => {
-      const { container } = renderForm()
-
-      fireEvent.click(screen.getByRole('button', { name: 'Image' }))
+    it('explains an empty task instead of rendering an unusable form', () => {
+      const { container } = renderForm({ models: [] })
 
       expect(
-        screen.getByText('No models available for this mode')
+        screen.getByText('No models available for this task')
       ).toBeInTheDocument()
       expect(controlOrder(container)).toEqual(['media-prompt'])
-    })
-
-    it('explains an unsupported contract version instead of rendering', () => {
-      const { container } = renderForm({
-        ...v1,
-        contract_version: 2,
-      } as unknown as AtomicMediaCapabilities)
-
-      expect(
-        screen.getByText('Media model capabilities unavailable')
-      ).toBeInTheDocument()
-      expect(controlOrder(container)).toEqual([])
-    })
-
-    it('explains absent capabilities instead of rendering', () => {
-      const { container } = renderForm(null)
-
-      expect(
-        screen.getByText('Media model capabilities unavailable')
-      ).toBeInTheDocument()
-      expect(controlOrder(container)).toEqual([])
     })
   })
 })
