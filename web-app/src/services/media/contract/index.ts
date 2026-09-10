@@ -16,6 +16,8 @@ export {
 } from './tasks'
 
 export {
+  MEDIA_MAX_GENERATED_SEED,
+  resolveSeeds,
   validateParams,
   visibleParams,
   type MediaParamDependency,

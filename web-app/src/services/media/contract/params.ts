@@ -442,3 +442,60 @@ export function validateParams(
     ? { ok: true, values: output, errors }
     : { ok: false, values: output, errors }
 }
+
+/**
+ * The largest seed this app will generate for itself.
+ *
+ * ComfyUI states a seed's ceiling as 2^64-1, which JSON cannot carry: anything
+ * past 2^53-1 does not survive `JSON.stringify` intact, so a job would run on a
+ * seed nobody chose and provenance would record a number the provider never
+ * saw. Staying inside the safe-integer range keeps the recorded seed and the
+ * submitted seed the same number.
+ */
+export const MEDIA_MAX_GENERATED_SEED = Number.MAX_SAFE_INTEGER
+
+/**
+ * Fill in any seed the user left blank, so the CALLER knows what it sent.
+ *
+ * Decision D8. Previously a blank seed was left for the provider to randomise,
+ * which meant the number was unrecoverable the moment it was used: provenance
+ * could not answer "how did I make this?", and a library "re-run" would quietly
+ * produce a different image. Resolving here - once, above every adapter - makes
+ * that honest for all providers at the same time, and needs no contract change,
+ * because a resolved seed is simply a param with a value.
+ *
+ * Only seeds are touched. Every other blank param keeps its existing meaning,
+ * where absent means "the provider's default applies".
+ *
+ * `random` is injected so the choice is testable; it must behave like
+ * `Math.random`, returning a float in [0, 1).
+ */
+export function resolveSeeds(
+  specs: MediaParamSpec[],
+  params: Record<string, unknown>,
+  random: () => number = Math.random
+): Record<string, unknown> {
+  // Copied rather than mutated: the caller's request object is also what gets
+  // recorded as provenance, and a surprise in-place edit there is the kind of
+  // bug that only shows up in the saved metadata.
+  const resolved = { ...params }
+
+  for (const spec of specs) {
+    if (spec.type !== 'seed') continue
+
+    const current = resolved[spec.id]
+    // A seed the user actually chose is never overwritten - that is the whole
+    // point of being able to type one in.
+    if (typeof current === 'number' && Number.isFinite(current)) continue
+
+    const min = Number.isFinite(spec.min) ? (spec.min as number) : 0
+    const max = Number.isFinite(spec.max)
+      ? (spec.max as number)
+      : MEDIA_MAX_GENERATED_SEED
+    const span = Math.max(0, max - min)
+
+    resolved[spec.id] = min + Math.floor(random() * (span + 1))
+  }
+
+  return resolved
+}

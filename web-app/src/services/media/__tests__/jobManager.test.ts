@@ -510,3 +510,100 @@ describe('createMediaJobManager — subscribe over poll', () => {
     expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1)
   })
 })
+
+/**
+ * Decision D8, answered by the user 2026-09-10: the caller resolves a blank
+ * seed, not the provider.
+ *
+ * The manager is where that happens, because it is the last place that sees the
+ * request before an adapter does and the first place that records it. The
+ * promise these tests pin is narrow but load-bearing: WHAT WAS SUBMITTED AND
+ * WHAT WAS RECORDED ARE THE SAME NUMBER. If those two ever diverge, provenance
+ * lies and "re-run" silently produces a different image.
+ */
+describe('seed resolution (D8)', () => {
+  const seedModel: MediaCapabilities = {
+    contract_version: 2,
+    provider_id: 'worker',
+    devices: [],
+    features: {},
+    models: [
+      {
+        id: 'worker:model',
+        provider_id: 'worker',
+        local_id: 'model',
+        label: 'Model',
+        tasks: ['text_to_image'],
+        params: {
+          text_to_image: [
+            { id: 'seed', type: 'seed', label: 'Seed', min: 0, max: 999 },
+          ],
+        },
+      },
+    ],
+  }
+
+  function managerWithSeeds(random: () => number) {
+    const adapter = fakeAdapter(providerA)
+    const manager = createMediaJobManager({
+      createAdapter: () => adapter,
+      providers: () => [providerA],
+      capabilitiesFor: () => seedModel,
+      random,
+    })
+    return { adapter, manager }
+  }
+
+  it('sends a resolved seed even though the user left it blank', async () => {
+    const { adapter, manager } = managerWithSeeds(() => 0.5)
+
+    await manager.submit(requestFor('worker'))
+
+    const sent = adapter.submit.mock.calls[0]![0] as NormalizedMediaRequest
+    expect(typeof sent.params.seed).toBe('number')
+    expect(sent.params.seed).toBeGreaterThanOrEqual(0)
+    expect(sent.params.seed).toBeLessThanOrEqual(999)
+
+    manager.dispose()
+  })
+
+  it('records exactly the seed it submitted, so provenance cannot lie', async () => {
+    const { adapter, manager } = managerWithSeeds(() => 0.25)
+
+    const entry = await manager.submit(requestFor('worker'))
+
+    const sent = adapter.submit.mock.calls[0]![0] as NormalizedMediaRequest
+    expect(entry.request.params.seed).toBe(sent.params.seed)
+
+    manager.dispose()
+  })
+
+  it('never overwrites a seed the user chose', async () => {
+    const { adapter, manager } = managerWithSeeds(() => 0.5)
+
+    const request = requestFor('worker')
+    await manager.submit({ ...request, params: { ...request.params, seed: 7 } })
+
+    const sent = adapter.submit.mock.calls[0]![0] as NormalizedMediaRequest
+    expect(sent.params.seed).toBe(7)
+
+    manager.dispose()
+  })
+
+  it('does not add a seed to a model that declares none', async () => {
+    const adapter = fakeAdapter(providerA)
+    const manager = createMediaJobManager({
+      createAdapter: () => adapter,
+      providers: () => [providerA],
+      capabilitiesFor: () => capabilities('worker', {}),
+      random: () => 0.5,
+    })
+
+    await manager.submit(requestFor('worker'))
+
+    const sent = adapter.submit.mock.calls[0]![0] as NormalizedMediaRequest
+    expect(sent.params).not.toHaveProperty('seed')
+
+    manager.dispose()
+  })
+})

@@ -25,6 +25,7 @@
 import { createStore, type StoreApi } from 'zustand/vanilla'
 
 import { createMediaAdapter } from './providerFactory'
+import { resolveSeeds } from './contract'
 import {
   getMediaProvidersSync,
   useMediaProviderStore,
@@ -97,6 +98,8 @@ export type MediaJobManagerDeps = {
   providers: () => MediaProviderDescriptor[]
   capabilitiesFor: (providerId: string) => MediaCapabilities | undefined
   now?: () => number
+  /** Seed source. Injected so D8's resolution is testable. Like Math.random. */
+  random?: () => number
 }
 
 export type MediaJobManager = {
@@ -135,6 +138,7 @@ export function createMediaJobManager(
   deps: MediaJobManagerDeps
 ): MediaJobManager {
   const now = deps.now ?? (() => Date.now())
+  const random = deps.random ?? Math.random
   const store = createStore<MediaJobManagerState>(() => ({
     jobs: {},
     order: [],
@@ -315,15 +319,28 @@ export function createMediaJobManager(
         )
       }
 
+      // Decision D8: the seed is resolved HERE, above every adapter, so the app
+      // knows the number it sent. Leaving it to the provider made the value
+      // unrecoverable, which is what stopped provenance and "re-run" from
+      // telling the truth. `resolved` - not `request` - is what gets submitted
+      // AND what gets recorded, so those two can never disagree.
+      const capabilities = deps.capabilitiesFor(request.provider_id)
+      const specs =
+        capabilities?.models.find((model) => model.id === request.model_id)
+          ?.params?.[request.task] ?? []
+      const resolved: NormalizedMediaRequest = specs.length
+        ? { ...request, params: resolveSeeds(specs, request.params, random) }
+        : request
+
       inFlight.add(request.client_job_id)
       try {
         const adapter = deps.createAdapter(descriptor)
-        const snapshot = await adapter.submit(request)
-        const features = deps.capabilitiesFor(request.provider_id)?.features
+        const snapshot = await adapter.submit(resolved)
+        const features = capabilities?.features
 
         const entry: MediaJobEntry = {
           ...snapshot,
-          request,
+          request: resolved,
           submitted_at: now(),
           cancellable:
             features?.cancel === true && typeof adapter.cancel === 'function',

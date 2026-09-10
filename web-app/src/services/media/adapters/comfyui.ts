@@ -245,14 +245,15 @@ export function createComfyUiAdapter(
         continue
       }
 
-      // An absent seed means "randomise" (see `validateParams`: a blank value is
-      // dropped rather than coerced to 0). Resolving it here rather than leaving
-      // the template's 0 in place is what makes two identical submissions differ.
-      if (declared.spec?.type === 'seed') {
-        node.inputs[declared.input] = Math.floor(
-          Math.random() * Number.MAX_SAFE_INTEGER
-        )
-      }
+      // A seed is NOT randomised here any more. Decision D8, answered by the
+      // user on 2026-09-10: the caller resolves a blank seed before submitting,
+      // so the app knows the number it sent and provenance can be truthful.
+      // Randomising at this depth made the value unrecoverable the instant it
+      // was used, which is what broke "re-run" and "how did I make this?".
+      //
+      // A seed that is still absent here therefore means the caller genuinely
+      // did not resolve one, and the template's own value stands. That is the
+      // honest outcome: this adapter must not invent a number nobody records.
     }
 
     return graph

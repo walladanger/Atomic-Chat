@@ -539,7 +539,11 @@ describe('createComfyUiAdapter — submit', () => {
     expect(body.client_id).toBeTruthy()
   })
 
-  it('resolves an absent seed rather than submitting the template’s zero', async () => {
+  it('submits the caller’s seed verbatim and never invents one', async () => {
+    // Decision D8, answered 2026-09-10. This adapter used to randomise a blank
+    // seed itself, which made the number unrecoverable and left provenance
+    // unable to say how an image was made. Resolution moved up to the caller;
+    // this test pins the adapter's half of that bargain.
     vi.spyOn(Math, 'random').mockReturnValue(0.5)
     const adapter = createComfyUiAdapter(descriptor)
     const capabilities = await adapter.capabilities()
@@ -549,15 +553,35 @@ describe('createComfyUiAdapter — submit', () => {
       provider_id: descriptor.id,
       model_id: capabilities.models[0]!.id,
       task: 'text_to_image',
+      params: { prompt: 'a red car', seed: 4242 },
+    })
+
+    const body = state.bodies.at(-1) as {
+      prompt: Record<string, { inputs: Record<string, unknown> }>
+    }
+    // Exactly what the caller chose - not a re-roll, and not the template's 0.
+    expect(body.prompt['5']!.inputs.seed).toBe(4242)
+  })
+
+  it('leaves the template’s own seed alone when the caller resolved none', async () => {
+    // The honest outcome of D8: an unresolved seed is the caller's omission to
+    // answer for. Inventing one here would recreate the exact bug D8 closed.
+    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    const adapter = createComfyUiAdapter(descriptor)
+    const capabilities = await adapter.capabilities()
+
+    await adapter.submit({
+      client_job_id: '01JCOMFY00000000000000009',
+      provider_id: descriptor.id,
+      model_id: capabilities.models[0]!.id,
+      task: 'text_to_image',
       params: { prompt: 'a red car' },
     })
 
     const body = state.bodies.at(-1) as {
       prompt: Record<string, { inputs: Record<string, unknown> }>
     }
-    expect(body.prompt['5']!.inputs.seed).toBe(
-      Math.floor(0.5 * Number.MAX_SAFE_INTEGER)
-    )
+    expect(body.prompt['5']!.inputs.seed).toBe(0)
   })
 
   it('refuses a model id no declared template matches', async () => {
