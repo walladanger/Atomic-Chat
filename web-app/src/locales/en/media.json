@@ -1,0 +1,69 @@
+{
+  "providers": {
+    "cardTitle": "Media providers",
+    "listTitle": "Configured providers",
+    "listDescription": "Each provider is checked on its own. One that is unreachable does not affect the others.",
+    "refresh": "Refresh",
+    "add": "Add provider",
+    "newProvider": "New provider",
+    "name": "Name",
+    "baseUrl": "Base URL",
+    "adapter": "Adapter",
+    "apiKey": "API key",
+    "save": "Save provider",
+    "cancel": "Cancel",
+    "remove": "Remove",
+    "enable": "Enable {{label}}",
+    "noUrl": "No URL",
+    "secretStored": "Stored in your operating system's credential manager, never in the app's settings file.",
+    "secretUnavailable": "This system has no credential store, so a key cannot be saved securely. On Linux this usually means no Secret Service provider is running.",
+    "health": {
+      "online": "Online",
+      "offline": "Offline",
+      "checking": "Checking",
+      "unauthorised": "Needs a key"
+    },
+    "adapters": {
+      "atomic-media-worker": "Radium Media Worker",
+      "comfyui": "ComfyUI",
+      "openai-images": "OpenAI-compatible images",
+      "custom-http": "Custom HTTP"
+    },
+    "modelCount": "Models: {{count}}"
+  },
+  "models": {
+    "cardTitle": "{{provider}} models",
+    "emptyTitle": "No models",
+    "emptyDescription": "This provider reported no models. Enable it and refresh, or check that it is running.",
+    "install": "Install",
+    "installing": "Installing",
+    "installed": "Installed",
+    "starting": "Starting",
+    "percent": "{{percent}}%"
+  },
+  "library": {
+    "title": "Library",
+    "open": "Open the media library",
+    "task": "Task",
+    "allTasks": "All tasks",
+    "provider": "Provider",
+    "allProviders": "All providers",
+    "empty": "Nothing here yet. Generate something in Media and it will appear here.",
+    "noMatches": "No generations match these filters.",
+    "fileMissing": "File missing",
+    "truncated": "Showing the {{shown}} most recent of {{total}}. Narrow the filters to see older ones."
+  },
+  "asset": {
+    "prompt": "Prompt",
+    "seed": "Seed",
+    "seedUnknown": "not recorded (generated before the app tracked it)",
+    "created": "Created",
+    "file": "File",
+    "reRun": "Re-run",
+    "reRunNewSeed": "Re-run with a new seed",
+    "delete": "Delete"
+  },
+  "settings": {
+    "title": "Media"
+  }
+}

@@ -26,6 +26,21 @@ import {
   useMediaLibraryStore,
 } from '@/stores/media-library-store'
 
+// The default translation context returns the raw KEY and ignores
+// `defaultValue`, so a component rendered without a TranslationProvider shows
+// literal keys. Rather than change that shared default - five unrelated tests
+// deliberately assert on raw keys - this file delegates to the REAL i18n
+// instance. The assertions below therefore check the English a user actually
+// sees, and prove every `media:` key resolves. Recorded as decision D18.
+vi.mock('@/i18n/react-i18next-compat', async () => {
+  const setup = await vi.importActual<{ default: { t: (k: string, o?: Record<string, unknown>) => string } }>(
+    '@/i18n/setup'
+  )
+  return {
+    useTranslation: () => ({ t: setup.default.t, i18n: setup.default }),
+  }
+})
+
 vi.mock('@tauri-apps/api/core', () => ({
   convertFileSrc: (path: string) => `asset://${path}`,
 }))

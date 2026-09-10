@@ -19,6 +19,21 @@ import { MediaParamField } from '../MediaParamField'
 import { MediaParamGroups } from '../MediaParamGroup'
 import { useMediaParamState } from '../useMediaParamState'
 
+// The default translation context returns the raw KEY and ignores
+// `defaultValue`, so a component rendered without a TranslationProvider shows
+// literal keys. Rather than change that shared default - five unrelated tests
+// deliberately assert on raw keys - this file delegates to the REAL i18n
+// instance. The assertions below therefore check the English a user actually
+// sees, and prove every `media:` key resolves. Recorded as decision D18.
+vi.mock('@/i18n/react-i18next-compat', async () => {
+  const setup = await vi.importActual<{ default: { t: (k: string, o?: Record<string, unknown>) => string } }>(
+    '@/i18n/setup'
+  )
+  return {
+    useTranslation: () => ({ t: setup.default.t, i18n: setup.default }),
+  }
+})
+
 function spec(overrides: Partial<MediaParamSpec> & { id: string }): MediaParamSpec {
   return { type: 'string', ...overrides } as MediaParamSpec
 }
@@ -403,5 +418,47 @@ describe('useMediaParamState', () => {
     const { result } = renderHook(() => useMediaParamState(conditional))
 
     expect(result.current.visibleSpecs.map((entry) => entry.id)).toEqual(['hires'])
+  })
+})
+
+/**
+ * Task 14 Step 5 - a provider may translate its own parameters.
+ *
+ * `label_key` and `help_key` let a provider name a translation key instead of
+ * shipping raw English. The fallback behaviour is the part worth pinning: a
+ * provider that ships a key this build has no translation for must still show
+ * its own words, not a raw key like `media:providers.someKey`, because the user
+ * would have no idea what that means.
+ */
+describe('translated parameter labels (T14-S05)', () => {
+  it('resolves a label_key that this build knows', () => {
+    // A real key from the media namespace, so this proves resolution rather
+    // than just the fallback path.
+    renderField(
+      spec({ id: 'seed', type: 'seed', label_key: 'media:asset.seed' })
+    )
+
+    expect(screen.getByText('Seed')).toBeInTheDocument()
+  })
+
+  it("falls back to the provider's own label for a key it does not know", () => {
+    renderField(
+      spec({
+        id: 'guidance',
+        type: 'float',
+        label_key: 'media:providers.aKeyThisBuildHasNeverHeardOf',
+        label: 'Guidance scale',
+      })
+    )
+
+    expect(screen.getByText('Guidance scale')).toBeInTheDocument()
+    expect(screen.queryByText(/aKeyThisBuildHasNeverHeardOf/)).toBeNull()
+  })
+
+  it('leaves a spec with no label_key exactly as it was', () => {
+    // The overwhelmingly common case: providers that know nothing about i18n.
+    renderField(spec({ id: 'steps', type: 'int', label: 'Steps' }))
+
+    expect(screen.getByText('Steps')).toBeInTheDocument()
   })
 })

@@ -16,6 +16,7 @@
  *    assert on them and changing them would be an accessibility regression.
  */
 
+import { useTranslation } from '@/i18n/react-i18next-compat'
 import { cn } from '@/lib/utils'
 import type { MediaParamSpec } from '@/services/media/contract'
 import {
@@ -43,9 +44,22 @@ export function MediaParamField({
   onChange,
   onBlur,
 }: MediaParamFieldProps) {
+  const { t } = useTranslation()
   const domId = mediaParamDomId(spec)
   const ariaLabel = mediaParamLabel(spec)
-  const help = spec.help
+
+  // Task 14 Step 5. A provider may supply `label_key` / `help_key` instead of
+  // raw text, so its parameters can be translated like the rest of the app.
+  // The provider's own untranslated `label` / `help` is the defaultValue, so a
+  // provider that ships a key we have no translation for still renders its own
+  // words rather than a raw key - and one that ships no key at all is
+  // unaffected.
+  const label = spec.label_key
+    ? t(spec.label_key, { defaultValue: spec.label ?? ariaLabel })
+    : (spec.label ?? ariaLabel)
+  const help = spec.help_key
+    ? t(spec.help_key, { defaultValue: spec.help ?? '' })
+    : spec.help
 
   const known = isRenderableParam(spec)
 
@@ -59,7 +73,7 @@ export function MediaParamField({
   return (
     <div>
       <label className={labelClass} htmlFor={domId}>
-        {spec.label ?? ariaLabel}
+        {label}
         {spec.required ? <span aria-hidden="true"> *</span> : null}
       </label>
 

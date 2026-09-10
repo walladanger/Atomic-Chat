@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Card, CardItem } from '@/containers/Card'
+import { useTranslation } from '@/i18n/react-i18next-compat'
 import { cn } from '@/lib/utils'
 import {
   mediaSecretKey,
@@ -75,6 +76,7 @@ const HEALTH_LABEL: Record<string, string> = {
 }
 
 function HealthBadge({ state }: { state?: string }) {
+  const { t } = useTranslation()
   const resolved = state ?? 'checking'
   return (
     <span
@@ -86,12 +88,15 @@ function HealthBadge({ state }: { state?: string }) {
         resolved === 'checking' && 'bg-muted text-muted-foreground'
       )}
     >
-      {HEALTH_LABEL[resolved] ?? resolved}
+      {t(`media:providers.health.${resolved}`, {
+        defaultValue: HEALTH_LABEL[resolved] ?? resolved,
+      })}
     </span>
   )
 }
 
 export function ProviderList() {
+  const { t } = useTranslation()
   const providers = useMediaProviderStore((state) => state.providers)
   const health = useMediaProviderStore((state) => state.health)
   const errors = useMediaProviderStore((state) => state.errors)
@@ -201,10 +206,15 @@ export function ProviderList() {
   )
 
   return (
-    <Card title="Media providers">
+    <Card title={t('media:providers.cardTitle', { defaultValue: 'Media providers' })}>
       <CardItem
-        title="Configured providers"
-        description="Each provider is checked on its own. One that is unreachable does not affect the others."
+        title={t('media:providers.listTitle', {
+          defaultValue: 'Configured providers',
+        })}
+        description={t('media:providers.listDescription', {
+          defaultValue:
+            'Each provider is checked on its own. One that is unreachable does not affect the others.',
+        })}
         actions={
           <div className="flex gap-2">
             <Button
@@ -213,10 +223,10 @@ export function ProviderList() {
               onClick={() => void refresh()}
               disabled={refreshing}
             >
-              Refresh
+              {t('media:providers.refresh', { defaultValue: 'Refresh' })}
             </Button>
             <Button size="sm" onClick={() => setAdding(true)}>
-              Add provider
+              {t('media:providers.add', { defaultValue: 'Add provider' })}
             </Button>
           </div>
         }
@@ -225,12 +235,16 @@ export function ProviderList() {
       {adding && (
         <CardItem
           column
-          title="New provider"
+          title={t('media:providers.newProvider', {
+            defaultValue: 'New provider',
+          })}
           className="gap-2"
           description={
             <div className="mt-2 w-full space-y-2">
               <div className="space-y-1">
-                <label htmlFor="media-provider-name">Name</label>
+                <label htmlFor="media-provider-name">
+                  {t('media:providers.name', { defaultValue: 'Name' })}
+                </label>
                 <Input
                   id="media-provider-name"
                   value={name}
@@ -238,7 +252,9 @@ export function ProviderList() {
                 />
               </div>
               <div className="space-y-1">
-                <label htmlFor="media-provider-url">Base URL</label>
+                <label htmlFor="media-provider-url">
+                  {t('media:providers.baseUrl', { defaultValue: 'Base URL' })}
+                </label>
                 <Input
                   id="media-provider-url"
                   value={baseUrl}
@@ -246,7 +262,9 @@ export function ProviderList() {
                 />
               </div>
               <div className="space-y-1">
-                <label htmlFor="media-provider-adapter">Adapter</label>
+                <label htmlFor="media-provider-adapter">
+                  {t('media:providers.adapter', { defaultValue: 'Adapter' })}
+                </label>
                 <select
                   id="media-provider-adapter"
                   className="border-input h-9 w-full rounded-md border bg-transparent px-3"
@@ -257,13 +275,17 @@ export function ProviderList() {
                 >
                   {ADAPTER_OPTIONS.map((option) => (
                     <option key={option.id} value={option.id}>
-                      {option.label}
+                      {t(`media:providers.adapters.${option.id}`, {
+                        defaultValue: option.label,
+                      })}
                     </option>
                   ))}
                 </select>
               </div>
               <div className="space-y-1">
-                <label htmlFor="media-provider-key">API key</label>
+                <label htmlFor="media-provider-key">
+                  {t('media:providers.apiKey', { defaultValue: 'API key' })}
+                </label>
                 <Input
                   id="media-provider-key"
                   type="password"
@@ -273,24 +295,27 @@ export function ProviderList() {
                 />
                 {canStoreSecrets === false && (
                   <p className="text-xs text-destructive">
-                    This system has no credential store, so a key cannot be
-                    saved securely. On Linux this usually means no Secret
-                    Service provider is running.
+                    {t('media:providers.secretUnavailable', {
+                      defaultValue:
+                        'This system has no credential store, so a key cannot be saved securely. On Linux this usually means no Secret Service provider is running.',
+                    })}
                   </p>
                 )}
                 {canStoreSecrets === true && (
                   <p className="text-xs text-muted-foreground">
-                    Stored in your operating system&apos;s credential manager,
-                    never in the app&apos;s settings file.
+                    {t('media:providers.secretStored', {
+                      defaultValue:
+                        "Stored in your operating system's credential manager, never in the app's settings file.",
+                    })}
                   </p>
                 )}
               </div>
               <div className="flex gap-2">
                 <Button size="sm" onClick={handleSave}>
-                  Save provider
+                  {t('media:providers.save', { defaultValue: 'Save provider' })}
                 </Button>
                 <Button variant="link" size="sm" onClick={resetForm}>
-                  Cancel
+                  {t('media:providers.cancel', { defaultValue: 'Cancel' })}
                 </Button>
               </div>
             </div>
@@ -309,9 +334,15 @@ export function ProviderList() {
               <span className="flex flex-col gap-1">
                 <span className="flex items-center gap-2">
                   <HealthBadge state={health[provider.id]?.state} />
-                  <span>{provider.base_url ?? 'No URL'}</span>
                   <span>
-                    {models} {models === 1 ? 'model' : 'models'}
+                    {provider.base_url ??
+                      t('media:providers.noUrl', { defaultValue: 'No URL' })}
+                  </span>
+                  <span>
+                    {t('media:providers.modelCount', {
+                      count: models,
+                      defaultValue: 'Models: {{count}}',
+                    })}
                   </span>
                 </span>
                 {detail && (
@@ -322,7 +353,10 @@ export function ProviderList() {
             actions={
               <div className="flex items-center gap-2">
                 <Switch
-                  aria-label={`Enable ${provider.label}`}
+                  aria-label={t('media:providers.enable', {
+                    label: provider.label,
+                    defaultValue: 'Enable {{label}}',
+                  })}
                   checked={provider.enabled}
                   onCheckedChange={(checked) => handleToggle(provider, checked)}
                 />
@@ -332,7 +366,7 @@ export function ProviderList() {
                     size="sm"
                     onClick={() => removeProvider(provider.id)}
                   >
-                    Remove
+                    {t('media:providers.remove', { defaultValue: 'Remove' })}
                   </Button>
                 )}
               </div>

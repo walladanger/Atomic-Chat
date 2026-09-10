@@ -17,6 +17,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { convertFileSrc } from '@tauri-apps/api/core'
 
 import { Card } from '@/containers/Card'
+import { useTranslation } from '@/i18n/react-i18next-compat'
 import { AssetDetail, type MediaReRunRequest } from './AssetDetail'
 import type { MediaAsset } from '@/services/media/assets'
 import { useMediaLibraryStore } from '@/stores/media-library-store'
@@ -44,6 +45,7 @@ function Tile({
   selected: boolean
   onSelect: () => void
 }) {
+  const { t } = useTranslation()
   // An index entry outlives its file: the user can delete, move or sync it away
   // at any time. A broken <img> would render as a torn icon with no
   // explanation, so the failure is caught and named instead.
@@ -65,7 +67,7 @@ function Tile({
           data-testid="media-library-missing"
           className="flex h-24 items-center justify-center rounded bg-muted text-xs text-muted-foreground"
         >
-          File missing
+          {t('media:library.fileMissing', { defaultValue: 'File missing' })}
         </span>
       ) : (
         <img
@@ -87,6 +89,7 @@ function Tile({
 }
 
 export function MediaLibrary({ onReRun }: MediaLibraryProps) {
+  const { t } = useTranslation()
   const assets = useMediaLibraryStore((state) => state.assets)
   const loaded = useMediaLibraryStore((state) => state.loaded)
   const load = useMediaLibraryStore((state) => state.load)
@@ -127,11 +130,11 @@ export function MediaLibrary({ onReRun }: MediaLibraryProps) {
     filtered.find((asset) => asset.asset_id === selectedId) ?? null
 
   return (
-    <Card title="Library">
+    <Card title={t('media:library.title', { defaultValue: 'Library' })}>
       <div className="flex flex-wrap items-end gap-3 pb-3">
         <div className="space-y-1">
           <label htmlFor="media-library-task" className="text-xs">
-            Task
+            {t('media:library.task', { defaultValue: 'Task' })}
           </label>
           <select
             id="media-library-task"
@@ -139,7 +142,9 @@ export function MediaLibrary({ onReRun }: MediaLibraryProps) {
             value={task}
             onChange={(event) => setTask(event.target.value)}
           >
-            <option value={ALL}>All tasks</option>
+            <option value={ALL}>
+              {t('media:library.allTasks', { defaultValue: 'All tasks' })}
+            </option>
             {tasks.map((entry) => (
               <option key={entry} value={entry}>
                 {entry}
@@ -150,7 +155,7 @@ export function MediaLibrary({ onReRun }: MediaLibraryProps) {
 
         <div className="space-y-1">
           <label htmlFor="media-library-provider" className="text-xs">
-            Provider
+            {t('media:library.provider', { defaultValue: 'Provider' })}
           </label>
           <select
             id="media-library-provider"
@@ -158,7 +163,11 @@ export function MediaLibrary({ onReRun }: MediaLibraryProps) {
             value={provider}
             onChange={(event) => setProvider(event.target.value)}
           >
-            <option value={ALL}>All providers</option>
+            <option value={ALL}>
+              {t('media:library.allProviders', {
+                defaultValue: 'All providers',
+              })}
+            </option>
             {providers.map((entry) => (
               <option key={entry} value={entry}>
                 {entry}
@@ -171,8 +180,13 @@ export function MediaLibrary({ onReRun }: MediaLibraryProps) {
       {filtered.length === 0 ? (
         <p className="py-6 text-center text-muted-foreground">
           {assets.length === 0
-            ? 'Nothing here yet. Generate something in Media and it will appear here.'
-            : 'No generations match these filters.'}
+            ? t('media:library.empty', {
+                defaultValue:
+                  'Nothing here yet. Generate something in Media and it will appear here.',
+              })
+            : t('media:library.noMatches', {
+                defaultValue: 'No generations match these filters.',
+              })}
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
@@ -189,8 +203,12 @@ export function MediaLibrary({ onReRun }: MediaLibraryProps) {
 
       {filtered.length > shown.length && (
         <p className="pt-2 text-xs text-muted-foreground">
-          Showing the {MEDIA_LIBRARY_PAGE_SIZE} most recent of {filtered.length}.
-          Narrow the filters to see older ones.
+          {t('media:library.truncated', {
+            shown: MEDIA_LIBRARY_PAGE_SIZE,
+            total: filtered.length,
+            defaultValue:
+              'Showing the {{shown}} most recent of {{total}}. Narrow the filters to see older ones.',
+          })}
         </p>
       )}
 

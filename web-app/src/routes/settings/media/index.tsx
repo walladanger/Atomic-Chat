@@ -11,6 +11,7 @@ import { useState } from 'react'
 
 import HeaderPage from '@/containers/HeaderPage'
 import SettingsMenu from '@/containers/SettingsMenu'
+import { useTranslation } from '@/i18n/react-i18next-compat'
 import { ModelCatalog } from '@/containers/media/ModelCatalog'
 import { ProviderList } from '@/containers/media/ProviderList'
 import { route } from '@/constants/routes'
@@ -22,6 +23,7 @@ export const Route = createFileRoute(route.settings.media as any)({
 })
 
 function MediaSettings() {
+  const { t } = useTranslation()
   const providers = useMediaProviderStore((state) => state.providers)
   const [selected, setSelected] = useState<string | null>(null)
 
@@ -35,7 +37,7 @@ function MediaSettings() {
       <SettingsMenu />
       <div className="flex h-full w-full flex-col overflow-y-auto">
         <HeaderPage>
-          <span>Media</span>
+          <span>{t('media:settings.title', { defaultValue: 'Media' })}</span>
         </HeaderPage>
         <div className="flex flex-col gap-4 p-4">
           {/*
@@ -49,7 +51,7 @@ function MediaSettings() {
             to={route.media_library}
             className="text-sm underline underline-offset-4"
           >
-            Open the media library
+            {t('media:library.open', { defaultValue: 'Open the media library' })}
           </Link>
 
           <ProviderList />

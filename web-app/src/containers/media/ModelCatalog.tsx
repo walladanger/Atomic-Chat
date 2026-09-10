@@ -16,6 +16,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Card, CardItem } from '@/containers/Card'
+import { useTranslation } from '@/i18n/react-i18next-compat'
 import { createMediaAdapter } from '@/services/media/providerFactory'
 import { useMediaProviderStore } from '@/stores/media-provider-store'
 import type { MediaModelDescriptor } from '@/services/media/contract'
@@ -37,6 +38,7 @@ function percentOf(received: number, total?: number): number | null {
 }
 
 export function ModelCatalog({ providerId }: { providerId: string }) {
+  const { t } = useTranslation()
   const provider = useMediaProviderStore((state) =>
     state.providers.find((entry) => entry.id === providerId)
   )
@@ -93,11 +95,19 @@ export function ModelCatalog({ providerId }: { providerId: string }) {
   if (!provider) return null
 
   return (
-    <Card title={`${provider.label} models`}>
+    <Card
+      title={t('media:models.cardTitle', {
+        provider: provider.label,
+        defaultValue: '{{provider}} models',
+      })}
+    >
       {models.length === 0 && (
         <CardItem
-          title="No models"
-          description="This provider reported no models. Enable it and refresh, or check that it is running."
+          title={t('media:models.emptyTitle', { defaultValue: 'No models' })}
+          description={t('media:models.emptyDescription', {
+            defaultValue:
+              'This provider reported no models. Enable it and refresh, or check that it is running.',
+          })}
         />
       )}
 
@@ -131,7 +141,12 @@ export function ModelCatalog({ providerId }: { providerId: string }) {
                      * readable in the meantime.
                      */}
                     <span>
-                      {state.percent === null ? 'Starting' : `${state.percent}%`}
+                      {state.percent === null
+                        ? t('media:models.starting', { defaultValue: 'Starting' })
+                        : t('media:models.percent', {
+                            percent: state.percent,
+                            defaultValue: '{{percent}}%',
+                          })}
                     </span>
                   </span>
                 )}
@@ -142,12 +157,16 @@ export function ModelCatalog({ providerId }: { providerId: string }) {
             }
             actions={
               alreadyInstalled ? (
-                <span className="text-muted-foreground">Installed</span>
+                <span className="text-muted-foreground">
+                  {t('media:models.installed', { defaultValue: 'Installed' })}
+                </span>
               ) : state.phase === 'installing' ? (
-                <span className="text-muted-foreground">Installing</span>
+                <span className="text-muted-foreground">
+                  {t('media:models.installing', { defaultValue: 'Installing' })}
+                </span>
               ) : installable ? (
                 <Button size="sm" onClick={() => void handleInstall(model)}>
-                  Install
+                  {t('media:models.install', { defaultValue: 'Install' })}
                 </Button>
               ) : null
             }

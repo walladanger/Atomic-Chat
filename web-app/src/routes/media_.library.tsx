@@ -14,6 +14,7 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 
 import HeaderPage from '@/containers/HeaderPage'
+import { useTranslation } from '@/i18n/react-i18next-compat'
 import { MediaLibrary } from '@/containers/media/MediaLibrary'
 import { route } from '@/constants/routes'
 import { setPendingMediaReRun } from '@/services/media/rerun'
@@ -23,12 +24,13 @@ export const Route = createFileRoute('/media_/library')({
 })
 
 function MediaLibraryRoute() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
 
   return (
     <div className="flex h-full w-full flex-col overflow-y-auto">
       <HeaderPage>
-        <span>Library</span>
+        <span>{t('media:library.title', { defaultValue: 'Library' })}</span>
       </HeaderPage>
       <div className="p-4">
         <MediaLibrary

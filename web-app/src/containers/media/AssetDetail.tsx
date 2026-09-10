@@ -15,6 +15,7 @@
  */
 
 import { Button } from '@/components/ui/button'
+import { useTranslation } from '@/i18n/react-i18next-compat'
 import type { MediaAsset } from '@/services/media/assets'
 
 /** What the studio needs to run a generation again. */
@@ -38,6 +39,7 @@ function formatBytes(bytes: number): string {
 }
 
 export function AssetDetail({ asset, onReRun, onDelete }: AssetDetailProps) {
+  const { t } = useTranslation()
   const { provenance } = asset
 
   // Only what the app can stand behind. `resolved_seed` is set solely when the
@@ -77,36 +79,48 @@ export function AssetDetail({ asset, onReRun, onDelete }: AssetDetailProps) {
       </div>
 
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
-        <dt className="text-muted-foreground">Prompt</dt>
+        <dt className="text-muted-foreground">
+          {t('media:asset.prompt', { defaultValue: 'Prompt' })}
+        </dt>
         <dd className="break-words">{String(provenance.params.prompt ?? '')}</dd>
 
-        <dt className="text-muted-foreground">Seed</dt>
+        <dt className="text-muted-foreground">
+          {t('media:asset.seed', { defaultValue: 'Seed' })}
+        </dt>
         <dd>
           {seedKnown ? (
             String(provenance.resolved_seed)
           ) : (
             <span className="text-muted-foreground">
-              not recorded (generated before the app tracked it)
+              {t('media:asset.seedUnknown', {
+                defaultValue: 'not recorded (generated before the app tracked it)',
+              })}
             </span>
           )}
         </dd>
 
-        <dt className="text-muted-foreground">Created</dt>
+        <dt className="text-muted-foreground">
+          {t('media:asset.created', { defaultValue: 'Created' })}
+        </dt>
         <dd>{new Date(asset.created_at).toLocaleString()}</dd>
 
-        <dt className="text-muted-foreground">File</dt>
+        <dt className="text-muted-foreground">
+          {t('media:asset.file', { defaultValue: 'File' })}
+        </dt>
         <dd className="break-all">{asset.path}</dd>
       </dl>
 
       <div className="flex flex-wrap gap-2">
         {seedKnown && onReRun && (
           <Button size="sm" onClick={handleReRun}>
-            Re-run
+            {t('media:asset.reRun', { defaultValue: 'Re-run' })}
           </Button>
         )}
         {onReRun && (
           <Button size="sm" variant="link" onClick={handleReRunNewSeed}>
-            Re-run with a new seed
+            {t('media:asset.reRunNewSeed', {
+              defaultValue: 'Re-run with a new seed',
+            })}
           </Button>
         )}
         {onDelete && (
@@ -115,7 +129,7 @@ export function AssetDetail({ asset, onReRun, onDelete }: AssetDetailProps) {
             variant="link"
             onClick={() => onDelete(asset.asset_id)}
           >
-            Delete
+            {t('media:asset.delete', { defaultValue: 'Delete' })}
           </Button>
         )}
       </div>
