@@ -34,6 +34,7 @@ import { Route as ProjectProjectIdRouteImport } from './routes/project/$projectI
 import { Route as LocalApiServerLogsRouteImport } from './routes/local-api-server/logs'
 import { Route as HubModelIdRouteImport } from './routes/hub/$modelId'
 import { Route as SettingsProvidersIndexRouteImport } from './routes/settings/providers/index'
+import { Route as SettingsMediaIndexRouteImport } from './routes/settings/media/index'
 import { Route as SettingsProvidersProviderNameRouteImport } from './routes/settings/providers/$providerName'
 
 const SystemMonitorRoute = SystemMonitorRouteImport.update({
@@ -161,6 +162,11 @@ const SettingsProvidersIndexRoute = SettingsProvidersIndexRouteImport.update({
   path: '/settings/providers/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsMediaIndexRoute = SettingsMediaIndexRouteImport.update({
+  id: '/settings/media/',
+  path: '/settings/media/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsProvidersProviderNameRoute =
   SettingsProvidersProviderNameRouteImport.update({
     id: '/settings/providers/$providerName',
@@ -194,6 +200,7 @@ export interface FileRoutesByFullPath {
   '/launch/': typeof LaunchIndexRoute
   '/skills/': typeof SkillsIndexRoute
   '/settings/providers/$providerName': typeof SettingsProvidersProviderNameRoute
+  '/settings/media/': typeof SettingsMediaIndexRoute
   '/settings/providers/': typeof SettingsProvidersIndexRoute
 }
 export interface FileRoutesByTo {
@@ -222,6 +229,7 @@ export interface FileRoutesByTo {
   '/launch': typeof LaunchIndexRoute
   '/skills': typeof SkillsIndexRoute
   '/settings/providers/$providerName': typeof SettingsProvidersProviderNameRoute
+  '/settings/media': typeof SettingsMediaIndexRoute
   '/settings/providers': typeof SettingsProvidersIndexRoute
 }
 export interface FileRoutesById {
@@ -251,6 +259,7 @@ export interface FileRoutesById {
   '/launch/': typeof LaunchIndexRoute
   '/skills/': typeof SkillsIndexRoute
   '/settings/providers/$providerName': typeof SettingsProvidersProviderNameRoute
+  '/settings/media/': typeof SettingsMediaIndexRoute
   '/settings/providers/': typeof SettingsProvidersIndexRoute
 }
 export interface FileRouteTypes {
@@ -281,6 +290,7 @@ export interface FileRouteTypes {
     | '/launch/'
     | '/skills/'
     | '/settings/providers/$providerName'
+    | '/settings/media/'
     | '/settings/providers/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -309,6 +319,7 @@ export interface FileRouteTypes {
     | '/launch'
     | '/skills'
     | '/settings/providers/$providerName'
+    | '/settings/media'
     | '/settings/providers'
   id:
     | '__root__'
@@ -337,6 +348,7 @@ export interface FileRouteTypes {
     | '/launch/'
     | '/skills/'
     | '/settings/providers/$providerName'
+    | '/settings/media/'
     | '/settings/providers/'
   fileRoutesById: FileRoutesById
 }
@@ -366,6 +378,7 @@ export interface RootRouteChildren {
   LaunchIndexRoute: typeof LaunchIndexRoute
   SkillsIndexRoute: typeof SkillsIndexRoute
   SettingsProvidersProviderNameRoute: typeof SettingsProvidersProviderNameRoute
+  SettingsMediaIndexRoute: typeof SettingsMediaIndexRoute
   SettingsProvidersIndexRoute: typeof SettingsProvidersIndexRoute
 }
 
@@ -546,6 +559,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsProvidersIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/media/': {
+      id: '/settings/media/'
+      path: '/settings/media'
+      fullPath: '/settings/media/'
+      preLoaderRoute: typeof SettingsMediaIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/providers/$providerName': {
       id: '/settings/providers/$providerName'
       path: '/settings/providers/$providerName'
@@ -582,6 +602,7 @@ const rootRouteChildren: RootRouteChildren = {
   LaunchIndexRoute: LaunchIndexRoute,
   SkillsIndexRoute: SkillsIndexRoute,
   SettingsProvidersProviderNameRoute: SettingsProvidersProviderNameRoute,
+  SettingsMediaIndexRoute: SettingsMediaIndexRoute,
   SettingsProvidersIndexRoute: SettingsProvidersIndexRoute,
 }
 export const routeTree = rootRouteImport
