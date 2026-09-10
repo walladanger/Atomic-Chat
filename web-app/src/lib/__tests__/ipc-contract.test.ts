@@ -17,6 +17,15 @@ const EXPECTED_DESKTOP_ONLY = new Set([
   'check_for_app_updates',
   'get_local_http',
   'is_update_available',
+  // Radium Media provider credentials, in the OS credential store. Desktop
+  // only on purpose: mobile has no media providers, and shipping a credential
+  // surface it does not need would widen the attack surface for nothing.
+  // See docs/decisions/2026-09-10-store-media-provider-credentials-in-the-os-
+  // credential-store.md.
+  'media_secret_available',
+  'media_secret_delete',
+  'media_secret_get',
+  'media_secret_set',
   'post_local_http',
   'set_telemetry_consent',
   'set_telemetry_context',

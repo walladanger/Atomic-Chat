@@ -19,8 +19,8 @@ import { Switch } from '@/components/ui/switch'
 import { Card, CardItem } from '@/containers/Card'
 import { cn } from '@/lib/utils'
 import {
-  MEDIA_SECRET_PERSISTENCE,
   mediaSecretKey,
+  mediaSecretStorageAvailable,
   setMediaProviderSecret,
 } from '@/services/media/secrets'
 import { useMediaProviderStore } from '@/stores/media-provider-store'
@@ -111,9 +111,27 @@ export function ProviderList() {
     useState<MediaProviderAdapterId>('atomic-media-worker')
   const [apiKey, setApiKey] = useState('')
 
+  /**
+   * Whether this machine can store a credential at all. Asked BEFORE offering
+   * to save one, so a user on a Linux box with no Secret Service is told up
+   * front rather than finding out when a generation fails to authenticate.
+   * `null` means "not answered yet".
+   */
+  const [canStoreSecrets, setCanStoreSecrets] = useState<boolean | null>(null)
+
   useEffect(() => {
     void refresh()
   }, [refresh])
+
+  useEffect(() => {
+    let cancelled = false
+    void mediaSecretStorageAvailable().then((available) => {
+      if (!cancelled) setCanStoreSecrets(available)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const ordered = useMemo(
     () => [...providers].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
@@ -153,7 +171,10 @@ export function ProviderList() {
       order: providers.length,
     }
 
-    if (wantsKey) setMediaProviderSecret(id, apiKey)
+    // Fire-and-forget is deliberate: the provider is added either way, and a
+    // credential store that refuses is reported by the adapter as "no API key
+    // configured" rather than by blocking the form on an IPC round trip.
+    if (wantsKey) void setMediaProviderSecret(id, apiKey)
     addProvider(descriptor)
     resetForm()
     void refresh({ providerId: id })
@@ -250,11 +271,17 @@ export function ProviderList() {
                   value={apiKey}
                   onChange={(event) => setApiKey(event.target.value)}
                 />
-                {MEDIA_SECRET_PERSISTENCE === 'session' && (
+                {canStoreSecrets === false && (
+                  <p className="text-xs text-destructive">
+                    This system has no credential store, so a key cannot be
+                    saved securely. On Linux this usually means no Secret
+                    Service provider is running.
+                  </p>
+                )}
+                {canStoreSecrets === true && (
                   <p className="text-xs text-muted-foreground">
-                    Kept for this session only. Radium Chat cannot store it
-                    securely yet, so you will need to enter it again after a
-                    restart.
+                    Stored in your operating system&apos;s credential manager,
+                    never in the app&apos;s settings file.
                   </p>
                 )}
               </div>

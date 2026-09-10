@@ -1,65 +1,104 @@
 /**
  * Where a media provider's API key lives.
  *
- * THIS IS A SEAM, NOT A SECRET STORE. It exists so the settings UI has exactly
- * one place to hand a credential to, and so that replacing the backing store is
- * a one-file change rather than a hunt through components.
+ * The OS credential store: Windows Credential Manager, macOS Keychain, Linux
+ * Secret Service. See
+ * `docs/decisions/2026-09-10-store-media-provider-credentials-in-the-os-credential-store.md`.
  *
- * Today the backing store is an in-memory Map, which means:
- *  - the key survives navigation within a session, and
- *  - it is GONE on relaunch, and the user is told so by the UI.
+ * NOT `localStorage`, NOT `tauri-plugin-store`, and NOT the provider store. A
+ * descriptor carries only `auth.setting_key`, a POINTER naming where the
+ * credential is kept; the credential itself never enters the descriptor, the
+ * store, or the DOM.
  *
- * It is deliberately NOT localStorage and NOT the provider store. Decision D3
- * settled that provider secrets belong in the OS credential store (Windows
- * Credential Manager, macOS Keychain, Linux Secret Service) and explicitly
- * rejected both localStorage and "the same way cloud LLM provider keys already
- * are". Q5 approved the four crates needed to build that.
+ * Task 12 shipped this file as a seam over an in-memory map, because the OS
+ * side did not exist yet and persisting a key would have meant contradicting
+ * D3 or inventing a security design nobody approved. Task 18 replaced the
+ * backing store, which is exactly the change the seam existed to make: nothing
+ * outside this file had to move.
  *
- * That Rust work is not scheduled anywhere in the media platform plan - see
- * decision D14, which is open. Until it lands, persisting a key would mean
- * either contradicting D3 or inventing a security design nobody agreed to, so
- * this module does neither: it holds the key for the session, in memory, and
- * says as much.
- *
- * When the credential store lands, replace the three functions below with calls
- * into it. Nothing else in the app should need to change.
+ * Everything here is async now, because the credential store is across the IPC
+ * boundary. That is the one visible cost of the move.
  */
 
-const sessionSecrets = new Map<string, string>()
+import { invoke } from '@tauri-apps/api/core'
 
 /**
  * Names where a provider's credential is kept. Stored on the descriptor as
  * `auth.setting_key`; the credential itself is never written there.
+ *
+ * The shape is load-bearing: changing it orphans every key a user has already
+ * saved, because the old name is what the credential is filed under.
  */
 export function mediaSecretKey(providerId: string): string {
   return `media.${providerId}.api_key`
 }
 
-export function setMediaProviderSecret(providerId: string, secret: string) {
+/** Read a credential by the key a descriptor names. Used by the adapters. */
+export async function readMediaSecret(
+  settingKey: string
+): Promise<string | undefined> {
+  const secret = await invoke<string | null>('media_secret_get', {
+    key: settingKey,
+  })
+  return secret ?? undefined
+}
+
+export async function setMediaProviderSecret(
+  providerId: string,
+  secret: string
+): Promise<void> {
   const trimmed = secret.trim()
+  const key = mediaSecretKey(providerId)
+
+  // An emptied field means "forget it", not "store an empty string" - which
+  // would otherwise satisfy a has-a-key check while failing every request.
   if (!trimmed) {
-    sessionSecrets.delete(providerId)
+    await invoke('media_secret_delete', { key })
     return
   }
-  sessionSecrets.set(providerId, trimmed)
+
+  await invoke('media_secret_set', { key, secret: trimmed })
 }
 
-export function getMediaProviderSecret(providerId: string): string | undefined {
-  return sessionSecrets.get(providerId)
+export async function getMediaProviderSecret(
+  providerId: string
+): Promise<string | undefined> {
+  return readMediaSecret(mediaSecretKey(providerId))
 }
 
-export function hasMediaProviderSecret(providerId: string): boolean {
-  return sessionSecrets.has(providerId)
+export async function hasMediaProviderSecret(
+  providerId: string
+): Promise<boolean> {
+  return (await getMediaProviderSecret(providerId)) !== undefined
 }
 
-export function clearMediaProviderSecret(providerId: string) {
-  sessionSecrets.delete(providerId)
+export async function clearMediaProviderSecret(
+  providerId: string
+): Promise<void> {
+  await invoke('media_secret_delete', { key: mediaSecretKey(providerId) })
 }
 
 /**
- * How durable the current backing store is. The UI reads this to tell the user
- * the truth rather than implying a key was saved permanently. Flip this to
- * 'credential-store' in the same change that wires the OS keychain.
+ * Whether this machine can store a credential at all.
+ *
+ * The expected false case is Linux without a Secret Service provider - a
+ * headless box, or a minimal desktop. The settings UI asks BEFORE offering to
+ * save a key, so the user is told up front rather than discovering it when a
+ * generation fails to authenticate later.
+ */
+export async function mediaSecretStorageAvailable(): Promise<boolean> {
+  try {
+    return await invoke<boolean>('media_secret_available')
+  } catch {
+    // An older shell without the command, or IPC unavailable. Treated as "no
+    // storage" rather than throwing: the caller's question is answerable.
+    return false
+  }
+}
+
+/**
+ * How durable the backing store is. Kept so callers can explain themselves to
+ * the user without knowing the implementation.
  */
 export const MEDIA_SECRET_PERSISTENCE: 'session' | 'credential-store' =
-  'session'
+  'credential-store'

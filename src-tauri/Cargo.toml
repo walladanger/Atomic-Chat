@@ -6,7 +6,11 @@ authors = ["Jan <service@jan.ai>"]
 license = "MIT"
 repository = "https://github.com/janhq/jan"
 edition = "2021"
-rust-version = "1.77.2"
+# Raised from 1.77.2 on 2026-09-10 by Task 18. Credential storage requires it:
+# keyring-core needs 1.85 and the platform backends need 1.88. The old value
+# had become false - a build on an older toolchain would fail anyway, just
+# with a confusing resolver error instead of "requires rustc 1.88".
+rust-version = "1.88"
 resolver = "2"
 default-run = "Atomic-Chat"
 autobins = false
@@ -162,20 +166,40 @@ features = [
 [dev-dependencies]
 tempfile = "3.20.0"
 
+[target.'cfg(target_os = "macos")'.dependencies]
+apple-native-keyring-store = "1"
+
 [target.'cfg(unix)'.dependencies]
 nix = { version = "=0.30.1", features = ["signal", "process", "resource"] }
 libc = "0.2"
 
 [target.'cfg(target_os = "linux")'.dependencies]
+# zbus, NOT dbus: the dbus backend pulls libdbus-sys, which links the system
+# C library and would make libdbus-1-dev a NEW build requirement for Linux.
+# The zbus backend is pure Rust and this crate already depends on zbus 5
+# below, so this adds no system dependency. Q5 approved either one.
+zbus-secret-service-keyring-store = "1"
 zbus = { version = "5", default-features = false, features = ["tokio"] }
 notify-rust = "4"
 
 [target.'cfg(windows)'.dependencies]
+windows-native-keyring-store = "1"
 libc = "0.2.172"
 windows-sys = { version = "0.60.2", features = ["Win32_Storage_FileSystem", "Win32_Globalization"] }
 winreg = "0.52"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+# ATO / Radium Media: provider API keys live in the OS credential store, never
+# in localStorage. See docs/decisions/2026-09-10-store-media-provider-
+# credentials-in-the-os-credential-store.md. These four crates are the ones the
+# user approved by name under AGENTS.md rule 6 (tracker decision Q5); the
+# approval is scoped to credential storage only.
+# keyring-core, NOT the `keyring` crate: at 4.2 that one is the all-in-one
+# CLI (`pub use cli::*`) and pulling it in as a library would drag the CLI's
+# dependency tree into the app. keyring-core 1.0 is the library the three
+# approved platform stores already depend on, and is what Q5's "keyring 4.2
+# (core)" meant. Same family, same approval, fewer dependencies.
+keyring-core = "1"
 reqwest = { version = "0.11", features = ["json", "blocking", "stream", "native-tls-vendored"] }
 tauri-plugin-updater = "2"
 once_cell = "1.18"

@@ -233,6 +233,14 @@ pub fn run() {
         core::telemetry::commands::set_telemetry_consent,
         core::telemetry::commands::set_telemetry_context,
         core::telemetry::commands::set_telemetry_user,
+        // Radium Media provider credentials, in the OS credential store. See
+        // docs/decisions/2026-09-10-store-media-provider-credentials-in-the-os-
+        // credential-store.md. Desktop only, and deliberately no enumeration
+        // command: the caller always knows the key it is asking about.
+        core::media::commands::media_secret_set,
+        core::media::commands::media_secret_get,
+        core::media::commands::media_secret_delete,
+        core::media::commands::media_secret_available,
     ]);
 
     // Mobile: no updater commands

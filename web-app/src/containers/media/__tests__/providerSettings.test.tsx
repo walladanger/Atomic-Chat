@@ -42,6 +42,30 @@ const { mockAdapters } = vi.hoisted(() => ({
   mockAdapters: new Map<string, Partial<MediaProviderAdapter>>(),
 }))
 
+const { mockSecrets } = vi.hoisted(() => ({
+  mockSecrets: new Map<string, string>(),
+}))
+
+// The credential store lives in Rust now (Task 18). Stubbing the IPC boundary
+// keeps these tests exercising the real secrets module and the real component,
+// while guaranteeing the suite never touches a developer's actual keychain.
+vi.mock('@tauri-apps/api/core', () => ({
+  invoke: async (command: string, args: Record<string, unknown>) => {
+    const key = args?.key as string
+    if (command === 'media_secret_set') {
+      mockSecrets.set(key, args.secret as string)
+      return undefined
+    }
+    if (command === 'media_secret_get') return mockSecrets.get(key) ?? null
+    if (command === 'media_secret_delete') {
+      mockSecrets.delete(key)
+      return undefined
+    }
+    if (command === 'media_secret_available') return true
+    throw new Error(`unexpected command ${command}`)
+  },
+}))
+
 vi.mock('@/services/media/providerFactory', () => ({
   createMediaAdapter: (descriptor: MediaProviderDescriptor) => {
     const stub = mockAdapters.get(descriptor.id)
@@ -147,6 +171,7 @@ function seedStore(providers: MediaProviderDescriptor[]) {
 
 beforeEach(() => {
   mockAdapters.clear()
+  mockSecrets.clear()
   localStorage.clear()
   seedStore([])
 })
@@ -359,6 +384,8 @@ describe('provider secrets', () => {
       .providers.find((provider) => provider.label === 'Cloud Images')
     expect(cloud?.auth?.type).toBe('api_key')
     expect(cloud?.auth?.setting_key).toBe('media.cloud-images.api_key')
-    expect(getMediaProviderSecret('cloud-images')).toBe('sk-super-secret-value')
+    expect(await getMediaProviderSecret('cloud-images')).toBe(
+      'sk-super-secret-value'
+    )
   })
 })

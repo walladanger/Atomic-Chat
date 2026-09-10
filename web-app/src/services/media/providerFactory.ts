@@ -10,6 +10,7 @@
 import { createAtomicWorkerAdapter } from './adapters/atomicWorker'
 import { createComfyUiAdapter } from './adapters/comfyui'
 import { createRemoteHttpAdapter } from './adapters/remoteHttp'
+import { readMediaSecret } from './secrets'
 import type { MediaProviderAdapter, MediaProviderDescriptor } from './contract'
 
 export class UnknownMediaAdapterError extends Error {
@@ -32,10 +33,15 @@ export function createMediaAdapter(
       return createComfyUiAdapter(descriptor)
     case 'openai-images':
     case 'custom-http':
-      // No secret resolver is wired yet: the OS credential store approved in
-      // D3/Q5 is follow-on work. Until it lands, a cloud provider reports
-      // unauthorised rather than silently sending a blank Authorization header.
-      return createRemoteHttpAdapter(descriptor)
+      // The credential is fetched per request, from the OS credential store,
+      // and never cached on the descriptor or in this module. Task 18 / D14.
+      //
+      // The adapter still refuses to build a request when this resolves to
+      // nothing, rather than sending a blank Authorization header - a provider
+      // with no key configured says so, instead of producing an opaque 401.
+      return createRemoteHttpAdapter(descriptor, {
+        resolveSecret: readMediaSecret,
+      })
     default:
       // Thrown rather than returning a null adapter: a provider configured
       // against an adapter this build does not have is a state the settings UI
