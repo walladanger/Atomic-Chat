@@ -55,6 +55,16 @@ export type MediaGenerationFormProps = {
   selectedModelId: string | null
   onSelectModel: (modelId: string) => void
   disabled?: boolean
+  /**
+   * Values to start from instead of the model's defaults.
+   *
+   * Used by a re-run handed over from the library (decision D17): the point of
+   * "Re-run" is that the form comes back EXACTLY as it was, so the defaults
+   * must not win over what was actually generated. Applied at mount only - the
+   * caller remounts via `key` when a new re-run arrives, because silently
+   * overwriting a form the user is already typing into would be worse.
+   */
+  initialParams?: Record<string, unknown>
   onSubmit: (request: NormalizedMediaRequest) => void | Promise<unknown>
 }
 
@@ -77,6 +87,7 @@ export function MediaGenerationForm({
   selectedModelId,
   onSelectModel,
   disabled = false,
+  initialParams,
   onSubmit,
 }: MediaGenerationFormProps) {
   // Which provider's models the model select is showing. Null means "follow
@@ -130,7 +141,7 @@ export function MediaGenerationForm({
     [specs]
   )
 
-  const { values, setValue, blur } = useMediaParamState(specs)
+  const { values, setValue, blur } = useMediaParamState(specs, initialParams)
 
   // The model's required device wins, then the first one offered. v1 did
   // exactly this, and the submitted body carries the result, so choosing

@@ -11,7 +11,7 @@
  * to disk before the preview sees them (decision Q4), and the form is driven by
  * the model's own parameter schema rather than by hand-written controls.
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { MediaGenerationForm } from './MediaGenerationForm'
 import { MediaJobStatus } from './MediaJobStatus'
@@ -20,13 +20,28 @@ import { useMediaGeneration } from '@/hooks/useMediaGeneration'
 import { useMediaJobAsset } from '@/hooks/useMediaJobAsset'
 import { useMediaProviderStore } from '@/stores/media-provider-store'
 import { isTerminalMediaJobState } from '@/services/media/jobManager'
+import {
+  takePendingMediaReRun,
+  type PendingMediaReRun,
+} from '@/services/media/rerun'
 import type {
   MediaDeviceDescriptor,
   MediaTaskId,
   MediaTaskPresentation,
 } from '@/services/media/contract'
 
-export function MediaStudio() {
+export type MediaStudioProps = {
+  /**
+   * A link to the media library, supplied by the route.
+   *
+   * Injected rather than built here so this component stays renderable without
+   * a router - which its own test relies on, and which keeps a routing concern
+   * out of a component that is otherwise pure presentation.
+   */
+  libraryLink?: ReactNode
+}
+
+export function MediaStudio({ libraryLink }: MediaStudioProps = {}) {
   const providers = useMediaProviderStore((state) => state.providers)
   const capabilities = useMediaProviderStore((state) => state.capabilities)
   const health = useMediaProviderStore((state) => state.health)
@@ -40,10 +55,33 @@ export function MediaStudio() {
   const { latest, submit, cancel } = useMediaGeneration()
   const [task, setTask] = useState<MediaTaskId | null>(null)
 
+  /**
+   * A generation handed over from the library (decision D17).
+   *
+   * Read in an effect rather than a `useState` initialiser: StrictMode invokes
+   * an initialiser twice and discards the first result, which would consume the
+   * handover and then throw it away. The ref makes the read happen once even
+   * though the effect itself runs twice.
+   */
+  const [reRun, setReRun] = useState<PendingMediaReRun | undefined>()
+  const consumedReRun = useRef(false)
+
   // Health is never persisted, so it has to be asked for on arrival.
   useEffect(() => {
     void refresh()
   }, [refresh])
+
+  useEffect(() => {
+    if (consumedReRun.current) return
+    consumedReRun.current = true
+
+    const pending = takePendingMediaReRun()
+    if (!pending) return
+
+    setReRun(pending)
+    setTask(pending.task as MediaTaskId)
+    setSelectedModel(pending.model_id)
+  }, [setSelectedModel])
 
   const enabledProviders = useMemo(
     () => providers.filter((provider) => provider.enabled),
@@ -127,6 +165,11 @@ export function MediaStudio() {
             <h1 className="mt-0.5 font-studio text-xl font-medium text-foreground">
               Media Studio
             </h1>
+            {libraryLink && (
+              <div className="mt-1 text-xs text-muted-foreground">
+                {libraryLink}
+              </div>
+            )}
           </div>
           <div className="rounded-full border border-border/60 bg-background px-3 py-1.5 text-xs text-muted-foreground shadow-sm">
             {headerLabel}
@@ -137,6 +180,10 @@ export function MediaStudio() {
       <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-5">
         <div className="mx-auto grid w-full max-w-[1500px] gap-4 lg:grid-cols-[minmax(320px,0.82fr)_minmax(440px,1.45fr)]">
           <MediaGenerationForm
+            // Remounted when a re-run arrives, so the handed-over values
+            // replace the model's defaults instead of losing to them.
+            key={reRun ? `rerun:${reRun.model_id}:${activeTask}` : 'studio'}
+            initialParams={reRun?.params}
             tasks={tasks}
             task={activeTask}
             onTaskChange={setTask}
