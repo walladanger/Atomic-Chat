@@ -132,13 +132,11 @@ export function ModelCatalog({ providerId }: { providerId: string }) {
                       value={state.percent ?? undefined}
                     />
                     {/*
-                     * The percentage is spelled out rather than left to the bar
-                     * alone. components/ui/progress destructures `value` and
-                     * never forwards it to the Radix root, so the bar renders
-                     * data-state="indeterminate" and carries no aria-valuenow -
-                     * it is decorative to a screen reader. Fixing that shared
-                     * primitive is out of scope here; this makes the number
-                     * readable in the meantime.
+                     * The percentage is spelled out as well as drawn. The bar
+                     * itself now announces its value too (decision D16 fixed
+                     * the shared primitive), but a visible number is still the
+                     * kinder thing for a long download - a sighted user should
+                     * not have to estimate from a bar's width.
                      */}
                     <span>
                       {state.percent === null

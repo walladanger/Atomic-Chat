@@ -313,11 +313,12 @@ describe('installing a model', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Install' }))
 
-    // Asserted on the readable percentage, not on aria-valuenow: the shared
-    // Progress primitive never forwards `value` to its Radix root, so the bar
-    // reports no value to assistive tech. The number the user can actually read
-    // is the honest thing to pin here.
-    expect(await screen.findByRole('progressbar')).toBeInTheDocument()
+    // Both halves: the bar now announces its value (D16 fixed the shared
+    // primitive), and the number is readable on screen.
+    expect(await screen.findByRole('progressbar')).toHaveAttribute(
+      'aria-valuenow',
+      '50'
+    )
     expect(await screen.findByText('50%')).toBeInTheDocument()
 
     release()

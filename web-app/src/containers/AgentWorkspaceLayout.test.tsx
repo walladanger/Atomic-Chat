@@ -175,7 +175,9 @@ describe('AgentWorkspaceLayout', () => {
     })
 
     expect(
-      await screen.findByText('chat:workspacePreview.generating')
+      await screen.findByText(
+        'Preview will be available after generation finishes.'
+      )
     ).toBeInTheDocument()
     expect(container.querySelector('iframe')).toBeNull()
   })

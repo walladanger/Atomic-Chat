@@ -85,3 +85,58 @@ describe('Progress', () => {
     expect(indicator?.style.transform).toContain('translateX(--50%)')
   })
 })
+
+/**
+ * Decision D16 - the bar must announce its progress.
+ *
+ * Before this, `value` was destructured out and used only for the indicator
+ * transform, so the Radix root never saw it: every progress bar in the app
+ * rendered `data-state="indeterminate"` with no `aria-valuenow` and told a
+ * screen-reader user nothing. That covered model downloads, backend updates and
+ * media installs - every long operation where progress matters most.
+ */
+describe('Progress accessibility', () => {
+  it('announces its value to assistive technology', () => {
+    render(<Progress value={50} />)
+
+    const bar = screen.getByRole('progressbar')
+    expect(bar).toHaveAttribute('aria-valuenow', '50')
+    expect(bar).toHaveAttribute('data-state', 'loading')
+  })
+
+  it('announces completion', () => {
+    render(<Progress value={100} />)
+
+    expect(screen.getByRole('progressbar')).toHaveAttribute(
+      'aria-valuenow',
+      '100'
+    )
+  })
+
+  it('stays indeterminate when there is no value', () => {
+    // Honest: "we do not know how far along this is" rather than claiming zero.
+    render(<Progress />)
+
+    const bar = screen.getByRole('progressbar')
+    expect(bar).not.toHaveAttribute('aria-valuenow')
+    expect(bar).toHaveAttribute('data-state', 'indeterminate')
+  })
+
+  it('stays indeterminate for a value outside the range', () => {
+    // This component tolerates out-of-range input for its visual transform, but
+    // forwarding it would make Radix log an error and would announce a number
+    // that is not a real percentage.
+    render(<Progress value={150} />)
+
+    expect(screen.getByRole('progressbar')).not.toHaveAttribute('aria-valuenow')
+  })
+
+  it('respects a custom max', () => {
+    render(<Progress value={30} max={60} />)
+
+    expect(screen.getByRole('progressbar')).toHaveAttribute(
+      'aria-valuenow',
+      '30'
+    )
+  })
+})
