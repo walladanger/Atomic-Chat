@@ -11,7 +11,7 @@ title: "Windows uses upstream `ggml-org/llama.cpp`, not the TurboQuant fork"
   Windows builds of the fork with all of those code paths working
   (especially the Metal-equivalents and the CUDA TurboQuant kernels) is
   not yet at the bar we ship on.
-- **Decision:** On **Windows x64** Atomic Chat downloads and runs the
+- **Decision:** On **Windows x64** Radium Chat downloads and runs the
   **official `ggml-org/llama.cpp`** release as the `llamacpp-extension`
   backend. macOS and Linux continue to use our
   `AtomicBot-ai/atomic-llama-cpp-turboquant` fork.

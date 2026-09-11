@@ -1,12 +1,15 @@
 import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { basename, resolve } from 'node:path'
 import { gunzipSync } from 'node:zlib'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
-const repositoryRoot = process.cwd().endsWith('/web-app')
-  ? resolve(process.cwd(), '..')
-  : process.cwd()
+// `basename`, not `endsWith('/web-app')`. On Windows cwd() ends with
+// `\web-app`, so the old check was always false, the root stayed pointing at
+// web-app, and every fixture read failed with ENOENT - nine tests failing for
+// no real reason, on the one platform this project is primarily developed on.
+const repositoryRoot =
+  basename(process.cwd()) === 'web-app' ? resolve(process.cwd(), '..') : process.cwd()
 
 const fixture = (name: string): unknown =>
   JSON.parse(

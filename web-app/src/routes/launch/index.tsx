@@ -752,7 +752,7 @@ function LaunchPage() {
         try {
           // Zed is a desktop editor, not a terminal agent: its AI agent lives
           // in its own window. Launch the app directly (no terminal) — the
-          // config we just wrote points its native Atomic Chat provider at the
+          // config we just wrote points its native Radium Chat provider at the
           // local server, and the user drives the Agent Panel from there.
           if (agent.id === 'zed') {
             await invoke('launch_zed')

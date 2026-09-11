@@ -1,3 +1,6 @@
+// `mod tests` inside tests.rs. Renaming either would churn every path that
+// refers to these tests for no behavioural gain.
+#[allow(clippy::module_inception)]
 #[cfg(test)]
 mod tests {
     use crate::core::server::proxy;

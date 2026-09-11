@@ -1,0 +1,28 @@
+{
+  "_source": {
+    "endpoint": "GET /system_stats",
+    "comfyui_version": "0.35.0",
+    "read_from": "github.com/comfyanonymous/ComfyUI@master — server.py system_stats()",
+    "read_on": "2026-09-09",
+    "trimmed": "The `system` block keeps only the keys this adapter reads plus enough context to recognise the shape; the real payload also carries required_frontend_version, installed_templates_version, required_templates_version, comfy_package_versions, embedded_python, deploy_environment and argv."
+  },
+  "system": {
+    "os": "win32",
+    "ram_total": 68448395264,
+    "ram_free": 41231228928,
+    "comfyui_version": "0.35.0",
+    "python_version": "3.12.7",
+    "pytorch_version": "2.5.1+cpu"
+  },
+  "devices": [
+    {
+      "name": "cpu",
+      "type": "cpu",
+      "index": null,
+      "vram_total": 68448395264,
+      "vram_free": 41231228928,
+      "torch_vram_total": 0,
+      "torch_vram_free": 0
+    }
+  ]
+}

@@ -9,7 +9,9 @@ decision is reversed, add a new one that says which record it supersedes.
 2. Add one line to the right section of this index.
 3. Do **not** paste the record body into `AGENTS.md`.
 
-215 records, 2026-05-19 → 2026-08-21.
+224 records, 2026-05-19 → 2026-09-10.
+
+<!-- The count was 215 before the eight Radium Media records of 2026-09-10, but there were 216 files: a pre-existing off-by-one, corrected here rather than carried forward. Verified by counting *.md excluding INDEX and _TEMPLATE. -->
 
 ---
 
@@ -18,7 +20,7 @@ decision is reversed, add a new one that says which record it supersedes.
 - **2026-08-13** — [Mirror and sign upstream llama.cpp releases in atomic-chat-conf](2026-08-13-mirror-and-sign-upstream-llama-cpp-in-atomic-chat-conf.md)
 - **2026-08-13** — [Add Windows ROCm to the upstream backend matrix](2026-08-13-add-windows-rocm-to-the-upstream-backend-matrix.md)
 - **2026-07-28** — [Ship dual llama providers on Windows and Linux](2026-07-28-ship-dual-llama-providers-on-windows-and-linux.md)
-- **2026-05-19** — [Product identity is "Atomic Chat"; new code stops carrying Jan branding](2026-05-19-product-identity-is-atomic-chat-new-code-stops-carrying-jan.md)
+- **2026-05-19** — [Product identity is "Radium Chat"; new code stops carrying Jan branding](2026-05-19-product-identity-is-atomic-chat-new-code-stops-carrying-jan.md)
 - **2026-05-22** — [Windows ships only `llamacpp-upstream`, sourced from `ggml-org/llama.cpp`](2026-05-22-windows-ships-only-llamacpp-upstream-sourced-from-ggml-org.md)
 - **2026-05-28** — [Linux ships only `llamacpp-upstream` (AppImage, upstream `ggml-org/llama.cpp`); Vulkan is the sole GPU path](2026-05-28-linux-ships-only-llamacpp-upstream-appimage-upstream-ggml-org.md)
 - **2026-05-19** — [Ship upstream `ggml-org/llama.cpp` as a second macOS provider, no fork](2026-05-19-ship-upstream-ggml-org-llama-cpp-as-a-second-macos-provider-no.md)
@@ -32,6 +34,20 @@ decision is reversed, add a new one that says which record it supersedes.
 - **2026-06-09** — [Default the macOS local llama.cpp engine to `llamacpp-upstream` so the Recommended Gemma 4 vision model loads out of the box (ATO-116)](2026-06-09-default-the-macos-local-llama-cpp-engine-to-llamacpp-upstream.md)
 
 ---
+
+## Radium Media platform (8)
+
+The model-agnostic media platform: provider adapters, the v2 contract, the
+library on disk, and how the frozen surface is allowed to change.
+
+- **2026-09-10** — [Adopt a provider-adapter architecture for Radium Media](2026-09-10-adopt-a-provider-adapter-architecture-for-radium-media.md)
+- **2026-09-10** — [Media contract v2 uses declarative parameter schemas with an open task vocabulary](2026-09-10-media-contract-v2-uses-declarative-parameter-schemas.md)
+- **2026-09-10** — [Materialise every media output to local disk before preview](2026-09-10-materialise-every-media-output-to-disk-before-preview.md)
+- **2026-09-10** — [The media library lives at `<data_folder>/media/` with provenance records](2026-09-10-the-media-library-lives-under-the-data-folder-with-provenance.md)
+- **2026-09-10** — [Re-baselining the selective-v2.0.32 protected manifest is an isolated, single-purpose commit](2026-09-10-re-baselining-the-protected-manifest-is-an-isolated-commit.md)
+- **2026-09-10** — [Cloud media providers are in scope, behind one remote HTTP adapter](2026-09-10-cloud-media-providers-are-in-scope-behind-one-remote-adapter.md)
+- **2026-09-10** — [Store media provider credentials in the OS credential store, never in localStorage](2026-09-10-store-media-provider-credentials-in-the-os-credential-store.md)
+- **2026-09-10** — [Media models and providers come from `atomic-chat-conf`](2026-09-10-media-models-and-providers-come-from-atomic-chat-conf.md) — decision only; Task 15 deferred
 
 ## Launch page & external coding agents (16)
 
@@ -97,10 +113,10 @@ decision is reversed, add a new one that says which record it supersedes.
 
 ## Speculative decoding — MTP / DFlash / EAGLE-3 / NextN (16)
 
-- **2026-07-13** — [Offer every published Atomic Chat DFlash GGUF to `llamacpp-upstream`](2026-07-13-offer-every-published-atomic-chat-dflash-gguf-to-llamacpp.md)
+- **2026-07-13** — [Offer every published Radium Chat DFlash GGUF to `llamacpp-upstream`](2026-07-13-offer-every-published-atomic-chat-dflash-gguf-to-llamacpp.md)
 - **2026-07-13** — [Force greedy sampling for `llamacpp-upstream` DFlash requests](2026-07-13-force-greedy-sampling-for-llamacpp-upstream-dflash-requests.md)
 - **2026-07-13** — [Detect embedded Qwen MTP from canonical GGUF metadata](2026-07-13-detect-embedded-qwen-mtp-from-canonical-gguf-metadata.md)
-- **2026-07-13** — [Default upstream DFlash downloads to Atomic Chat Q8_0 for every target quantization](2026-07-13-default-upstream-dflash-downloads-to-atomic-chat-q8-0-for-every.md)
+- **2026-07-13** — [Default upstream DFlash downloads to Radium Chat Q8_0 for every target quantization](2026-07-13-default-upstream-dflash-downloads-to-atomic-chat-q8-0-for-every.md)
 - **2026-07-13** — [Apply a request-local throughput profile whenever `llamacpp-upstream` DFlash is enabled](2026-07-13-apply-a-request-local-throughput-profile-whenever-llamacpp.md)
 - **2026-07-10** — [Probe `llamacpp-upstream` DFlash support and reject mislabeled bundled binaries](2026-07-10-probe-llamacpp-upstream-dflash-support-and-reject-mislabeled.md)
 - **2026-07-10** — [Pin `llamacpp-upstream` DFlash drafts converted for mainline llama.cpp](2026-07-10-pin-llamacpp-upstream-dflash-drafts-converted-for-mainline.md)
@@ -240,7 +256,7 @@ decision is reversed, add a new one that says which record it supersedes.
 - **2026-05-22** — [Windows ships `atomic-chat-cli.exe` as a copy of `jan.exe`](2026-05-22-windows-ships-atomic-chat-cli-exe-as-a-copy-of-jan-exe.md)
 - **2026-05-22** — [Windows auto-updater uses NSIS as sole relauncher](2026-05-22-windows-auto-updater-uses-nsis-as-sole-relauncher.md)
 - **2026-05-22** — [Pin static WiX `upgradeCode` to legacy Jan UUID for in-place MSI upgrades](2026-05-22-pin-static-wix-upgradecode-to-legacy-jan-uuid-for-in-place-msi.md)
-- **2026-05-19** — [Product identity is "Atomic Chat"; new code stops carrying Jan branding](2026-05-19-product-identity-is-atomic-chat-new-code-stops-carrying-jan.md)
+- **2026-05-19** — [Product identity is "Radium Chat"; new code stops carrying Jan branding](2026-05-19-product-identity-is-atomic-chat-new-code-stops-carrying-jan.md)
 
 ## UI / UX (23)
 

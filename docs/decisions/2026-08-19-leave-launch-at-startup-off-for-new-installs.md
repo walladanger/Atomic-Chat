@@ -6,7 +6,7 @@ title: "Leave launch at startup off for new installs"
 # 2026-08-19 — Leave launch at startup off for new installs
 
 - **Context:** `AppConfiguration::new_install()` wrote `pending_default_on`, so
-  the first launch of a fresh install added Atomic Chat to the OS login items
+  the first launch of a fresh install added Radium Chat to the OS login items
   (ADR 2026-08-05). Paired with model preloading, that meant a machine reboot
   silently started the app and loaded a model. Claiming a login item is a
   decision about the user's whole session, and we should not make it for them.

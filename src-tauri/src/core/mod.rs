@@ -8,6 +8,7 @@ pub mod extensions;
 pub mod filesystem;
 pub mod http;
 pub mod mcp;
+pub mod media;
 #[cfg(target_os = "windows")]
 pub mod notifications;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]

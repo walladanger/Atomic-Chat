@@ -1,8 +1,8 @@
-# Стабильный запуск и доработка Atomic Chat
+# Стабильный запуск и доработка Radium Chat
 
 ## Что произошло в логе
 
-1. **Ошибки Vite/esbuild** (`The service was stopped` / `The service is no longer running`) появились **после того, как ты закрыл окно Atomic Chat**. При закрытии приложения завершается процесс `cargo run` → завершается весь `yarn dev` → останавливается дочерний Vite. В момент остановки Vite ещё успевает попытаться обработать запросы (HMR и т.д.) и пишет, что сервис уже не запущен. Это не баг кода, а следствие остановки dev-процесса.
+1. **Ошибки Vite/esbuild** (`The service was stopped` / `The service is no longer running`) появились **после того, как ты закрыл окно Radium Chat**. При закрытии приложения завершается процесс `cargo run` → завершается весь `yarn dev` → останавливается дочерний Vite. В момент остановки Vite ещё успевает попытаться обработать запросы (HMR и т.д.) и пишет, что сервис уже не запущен. Это не баг кода, а следствие остановки dev-процесса.
 
 2. **Иконки генерируются при каждом запуске** — скрипт `dev:tauri` каждый раз вызывает `yarn build:icon`. Так задумано в проекте, добавляет несколько секунд к старту.
 
@@ -19,12 +19,12 @@ cd /Users/max/Desktop/desc-app/jan
 yarn dev
 ```
 
-- Дождись в логе: `Running target/debug/Atomic Chat` и появления окна Atomic Chat.
-- **Не закрывай этот терминал** и по возможности **не закрывай окно Atomic Chat** во время разработки.
+- Дождись в логе: `Running target/debug/Atomic Chat` и появления окна Radium Chat.
+- **Не закрывай этот терминал** и по возможности **не закрывай окно Radium Chat** во время разработки.
 - Редактируй код в `web-app/` — Vite подхватит изменения (hot reload), перезапуск не нужен.
 - Редактируешь Rust в `src-tauri/` — после сохранения Tauri сам пересоберёт и перезапустит приложение.
 
-**Когда закончил работу:** закрой окно Atomic Chat, затем в терминале нажми **Ctrl+C** один раз. Так и Vite, и Tauri завершатся предсказуемо, без лишних сообщений об остановленном сервисе.
+**Когда закончил работу:** закрой окно Radium Chat, затем в терминале нажми **Ctrl+C** один раз. Так и Vite, и Tauri завершатся предсказуемо, без лишних сообщений об остановленном сервисе.
 
 ---
 
@@ -33,9 +33,9 @@ yarn dev
 1. Открыть терминал.
 2. `cd /Users/max/Desktop/desc-app/jan`
 3. `yarn dev`
-4. Дождаться открытия окна Atomic Chat.
+4. Дождаться открытия окна Radium Chat.
 5. Дорабатывать фронт в `web-app/` или бэкенд в `src-tauri/`.
-6. В конце: закрыть окно Atomic Chat → в терминале **Ctrl+C**.
+6. В конце: закрыть окно Radium Chat → в терминале **Ctrl+C**.
 
 Повторный запуск — снова только `yarn dev` (без `make dev`), если не менял зависимости и не делал `make clean`.
 
@@ -61,7 +61,7 @@ yarn dev
 
 ---
 
-## Where Atomic Chat stores data on Windows
+## Where Radium Chat stores data on Windows
 
 Dev (`make dev-windows-cpu` / `yarn dev`) and the installed `Atomic Chat.exe` **share the same data folders** — there is no separate dev profile. Anything you delete from these paths affects both.
 
@@ -72,6 +72,7 @@ Dev (`make dev-windows-cpu` / `yarn dev`) and the installed `Atomic Chat.exe` **
 | `%APPDATA%\Atomic Chat\data\models\` | Downloaded GGUF / MLX models | factory reset (UI), `make clean-windows-all`, uninstaller |
 | `%APPDATA%\Atomic Chat\data\threads\` | Chat history | factory reset, `make clean-windows-all`, uninstaller |
 | `%APPDATA%\Atomic Chat\data\extensions\` | Installed extensions (`@janhq/*`, `llamacpp-extension`, …) | factory reset, `make clean-windows-all`, uninstaller |
+| `%APPDATA%\Atomic Chat\data\media\` | Radium Media output: generated images and video under `outputs\`, thumbnails under `thumbs\`, and `index.json` - the only durable record that a generation happened, including its provenance (provider, model, parameters, resolved seed). Deleting an asset in the library removes the file as well as the index entry. Files a provider wrote elsewhere are *adopted in place* and therefore live outside this folder. | factory reset, `make clean-windows-all`, uninstaller |
 | `%APPDATA%\Atomic Chat\data\logs\app.log` | Application logs (`tauri_plugin_log`) | factory reset, `make clean-windows-all`, uninstaller |
 | `%APPDATA%\Atomic Chat\data\store.json` | Migration / version store | factory reset, `make clean-windows-all`, uninstaller |
 | `%APPDATA%\Atomic Chat\data\mcp_config.json` | MCP servers config | factory reset, `make clean-windows-all`, uninstaller |
@@ -91,6 +92,16 @@ Dev (`make dev-windows-cpu` / `yarn dev`) and the installed `Atomic Chat.exe` **
 | Full wipe (all data, settings, WebView2 cache) — true first-launch | `make clean-windows-all CONFIRM=1` |
 | In-app reset (keeps downloaded backends and the active backend selection) | `Settings → General → Reset to Factory Default` |
 | End-user uninstall + delete data | Uninstaller → enable **Delete app data** checkbox |
+
+### Media provider credentials are NOT in the data folder
+
+API keys for cloud media providers live in the **operating system credential
+store** - Windows Credential Manager, under the service `Radium Chat - Media` -
+not in `settings.json`, not in `localStorage`, and not under `data\`. Nothing in
+the table above clears them: factory reset, `make clean-windows-all` and the
+uninstaller all leave them untouched. Remove one from `Settings -> Media` (delete
+the provider), or from Windows' own Credential Manager. See ADR
+`docs/decisions/2026-09-10-store-media-provider-credentials-in-the-os-credential-store.md`.
 
 ### Custom data folder
 

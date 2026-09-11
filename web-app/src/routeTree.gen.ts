@@ -31,9 +31,11 @@ import { Route as SettingsClaudeCodeRouteImport } from './routes/settings/claude
 import { Route as SettingsAttachmentsRouteImport } from './routes/settings/attachments'
 import { Route as SettingsAssistantRouteImport } from './routes/settings/assistant'
 import { Route as ProjectProjectIdRouteImport } from './routes/project/$projectId'
+import { Route as MediaLibraryRouteImport } from './routes/media_.library'
 import { Route as LocalApiServerLogsRouteImport } from './routes/local-api-server/logs'
 import { Route as HubModelIdRouteImport } from './routes/hub/$modelId'
 import { Route as SettingsProvidersIndexRouteImport } from './routes/settings/providers/index'
+import { Route as SettingsMediaIndexRouteImport } from './routes/settings/media/index'
 import { Route as SettingsProvidersProviderNameRouteImport } from './routes/settings/providers/$providerName'
 
 const SystemMonitorRoute = SystemMonitorRouteImport.update({
@@ -146,6 +148,11 @@ const ProjectProjectIdRoute = ProjectProjectIdRouteImport.update({
   path: '/project/$projectId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MediaLibraryRoute = MediaLibraryRouteImport.update({
+  id: '/media_/library',
+  path: '/media/library',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LocalApiServerLogsRoute = LocalApiServerLogsRouteImport.update({
   id: '/local-api-server/logs',
   path: '/local-api-server/logs',
@@ -159,6 +166,11 @@ const HubModelIdRoute = HubModelIdRouteImport.update({
 const SettingsProvidersIndexRoute = SettingsProvidersIndexRouteImport.update({
   id: '/settings/providers/',
   path: '/settings/providers/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsMediaIndexRoute = SettingsMediaIndexRouteImport.update({
+  id: '/settings/media/',
+  path: '/settings/media/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsProvidersProviderNameRoute =
@@ -175,6 +187,7 @@ export interface FileRoutesByFullPath {
   '/system-monitor': typeof SystemMonitorRoute
   '/hub/$modelId': typeof HubModelIdRoute
   '/local-api-server/logs': typeof LocalApiServerLogsRoute
+  '/media/library': typeof MediaLibraryRoute
   '/project/$projectId': typeof ProjectProjectIdRoute
   '/settings/assistant': typeof SettingsAssistantRoute
   '/settings/attachments': typeof SettingsAttachmentsRoute
@@ -194,6 +207,7 @@ export interface FileRoutesByFullPath {
   '/launch/': typeof LaunchIndexRoute
   '/skills/': typeof SkillsIndexRoute
   '/settings/providers/$providerName': typeof SettingsProvidersProviderNameRoute
+  '/settings/media/': typeof SettingsMediaIndexRoute
   '/settings/providers/': typeof SettingsProvidersIndexRoute
 }
 export interface FileRoutesByTo {
@@ -203,6 +217,7 @@ export interface FileRoutesByTo {
   '/system-monitor': typeof SystemMonitorRoute
   '/hub/$modelId': typeof HubModelIdRoute
   '/local-api-server/logs': typeof LocalApiServerLogsRoute
+  '/media/library': typeof MediaLibraryRoute
   '/project/$projectId': typeof ProjectProjectIdRoute
   '/settings/assistant': typeof SettingsAssistantRoute
   '/settings/attachments': typeof SettingsAttachmentsRoute
@@ -222,6 +237,7 @@ export interface FileRoutesByTo {
   '/launch': typeof LaunchIndexRoute
   '/skills': typeof SkillsIndexRoute
   '/settings/providers/$providerName': typeof SettingsProvidersProviderNameRoute
+  '/settings/media': typeof SettingsMediaIndexRoute
   '/settings/providers': typeof SettingsProvidersIndexRoute
 }
 export interface FileRoutesById {
@@ -232,6 +248,7 @@ export interface FileRoutesById {
   '/system-monitor': typeof SystemMonitorRoute
   '/hub/$modelId': typeof HubModelIdRoute
   '/local-api-server/logs': typeof LocalApiServerLogsRoute
+  '/media_/library': typeof MediaLibraryRoute
   '/project/$projectId': typeof ProjectProjectIdRoute
   '/settings/assistant': typeof SettingsAssistantRoute
   '/settings/attachments': typeof SettingsAttachmentsRoute
@@ -251,6 +268,7 @@ export interface FileRoutesById {
   '/launch/': typeof LaunchIndexRoute
   '/skills/': typeof SkillsIndexRoute
   '/settings/providers/$providerName': typeof SettingsProvidersProviderNameRoute
+  '/settings/media/': typeof SettingsMediaIndexRoute
   '/settings/providers/': typeof SettingsProvidersIndexRoute
 }
 export interface FileRouteTypes {
@@ -262,6 +280,7 @@ export interface FileRouteTypes {
     | '/system-monitor'
     | '/hub/$modelId'
     | '/local-api-server/logs'
+    | '/media/library'
     | '/project/$projectId'
     | '/settings/assistant'
     | '/settings/attachments'
@@ -281,6 +300,7 @@ export interface FileRouteTypes {
     | '/launch/'
     | '/skills/'
     | '/settings/providers/$providerName'
+    | '/settings/media/'
     | '/settings/providers/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -290,6 +310,7 @@ export interface FileRouteTypes {
     | '/system-monitor'
     | '/hub/$modelId'
     | '/local-api-server/logs'
+    | '/media/library'
     | '/project/$projectId'
     | '/settings/assistant'
     | '/settings/attachments'
@@ -309,6 +330,7 @@ export interface FileRouteTypes {
     | '/launch'
     | '/skills'
     | '/settings/providers/$providerName'
+    | '/settings/media'
     | '/settings/providers'
   id:
     | '__root__'
@@ -318,6 +340,7 @@ export interface FileRouteTypes {
     | '/system-monitor'
     | '/hub/$modelId'
     | '/local-api-server/logs'
+    | '/media_/library'
     | '/project/$projectId'
     | '/settings/assistant'
     | '/settings/attachments'
@@ -337,6 +360,7 @@ export interface FileRouteTypes {
     | '/launch/'
     | '/skills/'
     | '/settings/providers/$providerName'
+    | '/settings/media/'
     | '/settings/providers/'
   fileRoutesById: FileRoutesById
 }
@@ -347,6 +371,7 @@ export interface RootRouteChildren {
   SystemMonitorRoute: typeof SystemMonitorRoute
   HubModelIdRoute: typeof HubModelIdRoute
   LocalApiServerLogsRoute: typeof LocalApiServerLogsRoute
+  MediaLibraryRoute: typeof MediaLibraryRoute
   ProjectProjectIdRoute: typeof ProjectProjectIdRoute
   SettingsAssistantRoute: typeof SettingsAssistantRoute
   SettingsAttachmentsRoute: typeof SettingsAttachmentsRoute
@@ -366,6 +391,7 @@ export interface RootRouteChildren {
   LaunchIndexRoute: typeof LaunchIndexRoute
   SkillsIndexRoute: typeof SkillsIndexRoute
   SettingsProvidersProviderNameRoute: typeof SettingsProvidersProviderNameRoute
+  SettingsMediaIndexRoute: typeof SettingsMediaIndexRoute
   SettingsProvidersIndexRoute: typeof SettingsProvidersIndexRoute
 }
 
@@ -525,6 +551,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectProjectIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/media_/library': {
+      id: '/media_/library'
+      path: '/media/library'
+      fullPath: '/media/library'
+      preLoaderRoute: typeof MediaLibraryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/local-api-server/logs': {
       id: '/local-api-server/logs'
       path: '/local-api-server/logs'
@@ -546,6 +579,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsProvidersIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/media/': {
+      id: '/settings/media/'
+      path: '/settings/media'
+      fullPath: '/settings/media/'
+      preLoaderRoute: typeof SettingsMediaIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/providers/$providerName': {
       id: '/settings/providers/$providerName'
       path: '/settings/providers/$providerName'
@@ -563,6 +603,7 @@ const rootRouteChildren: RootRouteChildren = {
   SystemMonitorRoute: SystemMonitorRoute,
   HubModelIdRoute: HubModelIdRoute,
   LocalApiServerLogsRoute: LocalApiServerLogsRoute,
+  MediaLibraryRoute: MediaLibraryRoute,
   ProjectProjectIdRoute: ProjectProjectIdRoute,
   SettingsAssistantRoute: SettingsAssistantRoute,
   SettingsAttachmentsRoute: SettingsAttachmentsRoute,
@@ -582,6 +623,7 @@ const rootRouteChildren: RootRouteChildren = {
   LaunchIndexRoute: LaunchIndexRoute,
   SkillsIndexRoute: SkillsIndexRoute,
   SettingsProvidersProviderNameRoute: SettingsProvidersProviderNameRoute,
+  SettingsMediaIndexRoute: SettingsMediaIndexRoute,
   SettingsProvidersIndexRoute: SettingsProvidersIndexRoute,
 }
 export const routeTree = rootRouteImport

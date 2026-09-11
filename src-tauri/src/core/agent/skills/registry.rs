@@ -317,7 +317,7 @@ fn is_platform_compatible(
     supported: Option<&[SkillPlatform]>,
     current: Option<&SkillPlatform>,
 ) -> bool {
-    supported.map_or(true, |platforms| {
+    supported.is_none_or(|platforms| {
         current.is_some_and(|platform| platforms.contains(platform))
     })
 }

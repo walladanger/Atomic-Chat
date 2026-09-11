@@ -351,7 +351,7 @@ function General() {
             <Card title="Contact Us">
               <CardItem
                 title="Email"
-                description="Reach Atomic Chat support by email."
+                description="Reach Radium Chat support by email."
                 actions={
                   <a
                     href="mailto:support@atomic.chat"
@@ -367,7 +367,7 @@ function General() {
               />
               <CardItem
                 title="X"
-                description="Follow Atomic Chat on X."
+                description="Follow Radium Chat on X."
                 actions={
                   <a
                     href="https://x.com/atomic_chat_hq"
@@ -385,7 +385,7 @@ function General() {
               />
               <CardItem
                 title="GitHub"
-                description="View the Atomic Chat repository on GitHub."
+                description="View the Radium Chat repository on GitHub."
                 actions={
                   <a
                     href="https://github.com/AtomicBot-ai/Atomic-Chat"

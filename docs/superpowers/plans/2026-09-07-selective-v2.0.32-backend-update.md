@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Selectively integrate the approved v2.0.32 backend functionality, remove Atomic Code, bundle the four approved Windows runtime choices, and leave Atomic Media and unrelated fork behavior unchanged.
+**Goal:** Selectively integrate the approved v2.0.32 backend functionality, remove Atomic Code, bundle the four approved Windows runtime choices, and leave Radium Media and unrelated fork behavior unchanged.
 
 **Architecture:** Execute five independently reviewable phases: scope guards and Atomic Code removal; offline backend packaging and reliability fixes; Agent Mode runtime; composer-only Atomic Audio; and additive providers/connectors followed by release verification. Upstream `codex-upstream/v2.0.32` is a reference tree only; each port is reduced to the smallest dependency-complete patch for this fork.
 
@@ -14,7 +14,7 @@
 
 - Never merge or cherry-pick upstream wholesale; transplant named files and hunks from `codex-upstream/v2.0.32`.
 - Preserve the four original dirty paths: deleted `downloads/index.html`, modified `extensions/yarn.lock`, modified `src-tauri/icons/icon.png`, and modified `web-app/src/containers/DownloadManegement.tsx`.
-- Preserve every Atomic Media file listed in the spec at its recorded SHA-256 value.
+- Preserve every Radium Media file listed in the spec at its recorded SHA-256 value.
 - Remove Atomic Code page code only; keep generic code rendering, Launch coding integrations, and Agent Mode indexing/workspace tools.
 - Do not adopt upstream Cloud, Connectors, API, Voice Settings, sidebar, or assistant-layout redesigns.
 - Do not delete models, conversations, settings, credentials, MCP configuration, application data, or locales.
@@ -36,7 +36,7 @@
 
 **Interfaces:**
 - Consumes: repository root and the protected-file SHA-256 list.
-- Produces: `node scripts/verify-selective-v2032.mjs`, exiting zero only when Atomic Media hashes match, Atomic Code paths are absent, and prohibited route/model-router references are absent.
+- Produces: `node scripts/verify-selective-v2032.mjs`, exiting zero only when Radium Media hashes match, Atomic Code paths are absent, and prohibited route/model-router references are absent.
 
 - [ ] **Step 1: Write the failing guard test**
 
@@ -105,7 +105,7 @@ confirm it exits non-zero with `Atomic Code remains` before Task 2.
 test: guard selective update boundaries
 ```
 
-### Task 2: Remove Atomic Code without touching Atomic Media
+### Task 2: Remove Atomic Code without touching Radium Media
 
 **Files:**
 - Delete: `web-app/src/containers/code/CodeWorkspace.tsx`
@@ -153,7 +153,7 @@ Run: `yarn workspace @janhq/web-app vitest run src/containers/ChatAgentModeSwitc
 
 Run: `node scripts/verify-selective-v2032.mjs`
 
-Expected: PASS; all eleven Atomic Media hashes match and Atomic Code is absent.
+Expected: PASS; all eleven Radium Media hashes match and Atomic Code is absent.
 
 - [ ] **Step 5: Commit Atomic Code removal**
 
@@ -589,7 +589,7 @@ Run the Windows release build as far as unsigned local credentials permit. Recor
 
 - [ ] **Step 4: Prove boundaries and preserved dirt**
 
-Run `node scripts/verify-selective-v2032.mjs`. Compare each original dirty path against `backup/pre-v2.0.32-selective-dirty-20260907`; exclude those deltas from the implementation commit while retaining them in the worktree. Confirm no protected Atomic Media hash changed.
+Run `node scripts/verify-selective-v2032.mjs`. Compare each original dirty path against `backup/pre-v2.0.32-selective-dirty-20260907`; exclude those deltas from the implementation commit while retaining them in the worktree. Confirm no protected Radium Media hash changed.
 
 - [ ] **Step 5: Record ADR, test evidence, and handover**
 
@@ -605,4 +605,4 @@ feat: complete selective v2.0.32 backend update
 
 - [ ] **Step 7: Report completion**
 
-Report changed files grouped by subsystem, Atomic Media hashes, excluded upstream UI/routes, commit SHA, GitHub commit link, tests/builds, artifact size, and manual follow-up.
+Report changed files grouped by subsystem, Radium Media hashes, excluded upstream UI/routes, commit SHA, GitHub commit link, tests/builds, artifact size, and manual follow-up.

@@ -342,10 +342,7 @@ fn convert_messages(
             continue;
         }
 
-        let content_array = match content.as_array() {
-            Some(arr) => arr,
-            None => return None,
-        };
+        let content_array = content.as_array()?;
 
         match role {
             "assistant" => {
@@ -1576,7 +1573,7 @@ async fn inner_proxy_request<R: Runtime>(
         } else if !host.is_empty() {
             log::debug!(
                 "CORS preflight: Host is '{host}', trusted hosts: {:?}",
-                &config.trusted_hosts
+                config.trusted_hosts
             );
             is_valid_host(host, &config.trusted_hosts)
         } else {
@@ -2114,9 +2111,9 @@ async fn inner_proxy_request<R: Runtime>(
 
                             let (mlx_session_info, mlx_count) = {
                                 let mut mlx_session_info: Option<SessionInfo> = None;
-                                let mlx_count;
+                                
                                 let mlx_guard = mlx_sessions.lock().await;
-                                mlx_count = mlx_guard.len();
+                                let mlx_count = mlx_guard.len();
                                 if let Some(session) = mlx_guard.values().find(|s| {
                                     model_ids_match(&s.info.model_id, sessions_find_model)
                                 }) {
@@ -3420,7 +3417,7 @@ async fn start_server_internal<R: Runtime>(
             return Err(Box::new(e));
         }
     };
-    log::info!("Atomic Chat API server started on http://{bound_addr}");
+    log::info!("Radium Chat API server started on http://{bound_addr}");
 
     let server_task = tokio::spawn(async move {
         if let Err(e) = server.await {
@@ -3460,7 +3457,7 @@ async fn start_server_internal<R: Runtime>(
         analytics_task,
         analytics_shutdown,
     });
-    log::info!("Atomic Chat API server started successfully on port {actual_port}");
+    log::info!("Radium Chat API server started successfully on port {actual_port}");
     Ok(actual_port)
 }
 
@@ -3475,7 +3472,7 @@ pub async fn stop_server(
             log::warn!("Local API Server analytics flush task failed: {e}");
         }
         handle.server_task.abort();
-        log::info!("Atomic Chat API server stopped");
+        log::info!("Radium Chat API server stopped");
     } else {
         log::debug!("Server was not running");
     }

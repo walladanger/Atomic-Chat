@@ -2360,7 +2360,7 @@ export default class llamacpp_extension extends AIEngine {
    * part of that catalog, so the resolved target is never older — this cannot
    * downgrade anyone.
    *
-   * This is what makes a fork release reach users without an Atomic Chat
+   * This is what makes a fork release reach users without an Radium Chat
    * release, on every platform including macOS, where the bundled build is now
    * an offline baseline rather than the only source.
    */

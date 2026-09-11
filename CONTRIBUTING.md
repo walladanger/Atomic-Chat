@@ -1,8 +1,8 @@
-# Contributing to Atomic Chat
+# Contributing to Radium Chat
 
-First off, thank you for considering contributing to Atomic Chat. It's people like you that make Atomic Chat such an amazing project.
+First off, thank you for considering contributing to Radium Chat. It's people like you that make Radium Chat such an amazing project.
 
-Atomic Chat is an AI assistant that can run 100% offline on your device. Think ChatGPT, but private, local, and under your complete control. If you're thinking about contributing, you're already awesome - let's make AI accessible to everyone, one commit at a time.
+Radium Chat is an AI assistant that can run 100% offline on your device. Think ChatGPT, but private, local, and under your complete control. If you're thinking about contributing, you're already awesome - let's make AI accessible to everyone, one commit at a time.
 
 ## Quick Links to Component Guides
 
@@ -12,9 +12,9 @@ Atomic Chat is an AI assistant that can run 100% offline on your device. Think C
 - **[Tauri Backend](./src-tauri/CONTRIBUTING.md)** - Rust native integration
 - **[Tauri Plugins](./src-tauri/plugins/CONTRIBUTING.md)** - Hardware and system plugins
 
-## How Atomic Chat Actually Works
+## How Radium Chat Actually Works
 
-Atomic Chat is a desktop app that runs local AI models. Here's how the components actually connect:
+Radium Chat is a desktop app that runs local AI models. Here's how the components actually connect:
 
 ```
 ┌──────────────────────────────────────────────────────────┐

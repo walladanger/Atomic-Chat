@@ -109,5 +109,5 @@ title: 'Update upstream llama.cpp at runtime on macOS too'
 
 <!--
 Supersedes: 2026-05-19-ship-upstream-ggml-org-llama-cpp-as-a-second-macos-provider-no.md
-(only the "Upstream backend updates ship only with Atomic Chat releases" clause)
+(only the "Upstream backend updates ship only with Radium Chat releases" clause)
 -->

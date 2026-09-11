@@ -75,7 +75,7 @@ fn mask_proxy_creds(input: &str) -> String {
         let authority_end =
             after.find(|c: char| c == '/' || c == '?' || c == '#' || c.is_whitespace());
         match at {
-            Some(at_idx) if authority_end.map_or(true, |end| at_idx < end) => {
+            Some(at_idx) if authority_end.is_none_or(|end| at_idx < end) => {
                 out.push_str(REDACTED);
                 rest = &after[at_idx..]; // keep "@host..."
             }
@@ -131,7 +131,7 @@ fn mask_query_secrets(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
     let mut rest = input;
     loop {
-        let Some(delim) = rest.find(|c| c == '?' || c == '&') else {
+        let Some(delim) = rest.find(['?', '&']) else {
             out.push_str(rest);
             break;
         };

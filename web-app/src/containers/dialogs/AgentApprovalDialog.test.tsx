@@ -43,11 +43,11 @@ describe('AgentApprovalDialog', () => {
 
     expect(container.querySelector('.text-amber-500')).toBeNull()
     expect(
-      screen.getByRole('button', { name: /approveOnce/i })
+      screen.getByRole('button', { name: /approve once/i })
     ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /deny/i })).toBeInTheDocument()
     expect(
-      screen.getByRole('button', { name: /alwaysAllow/i })
+      screen.getByRole('button', { name: /always allow this action/i })
     ).toBeInTheDocument()
   })
 
@@ -60,7 +60,7 @@ describe('AgentApprovalDialog', () => {
     )
     const user = userEvent.setup()
     render(<AgentApprovalDialog />)
-    const approve = screen.getByRole('button', { name: /approveOnce/i })
+    const approve = screen.getByRole('button', { name: /approve once/i })
 
     await user.dblClick(approve)
 
@@ -95,7 +95,7 @@ describe('AgentApprovalDialog', () => {
     const user = userEvent.setup()
     render(<AgentApprovalDialog />)
 
-    await user.click(screen.getByRole('button', { name: /alwaysAllow/i }))
+    await user.click(screen.getByRole('button', { name: /always allow this action/i }))
 
     expect(resolveAgentApproval).toHaveBeenCalledWith({
       approval_id: 'approval-1',
@@ -110,7 +110,7 @@ describe('AgentApprovalDialog', () => {
     render(<AgentApprovalDialog />)
 
     expect(
-      screen.queryByRole('button', { name: /alwaysAllow/i })
+      screen.queryByRole('button', { name: /always allow this action/i })
     ).not.toBeInTheDocument()
   })
 
@@ -140,7 +140,7 @@ describe('AgentApprovalDialog', () => {
     const user = userEvent.setup()
     render(<AgentApprovalDialog />)
 
-    await user.click(screen.getByRole('button', { name: /approveOnce/i }))
+    await user.click(screen.getByRole('button', { name: /approve once/i }))
     await act(async () => {
       useAgentRun.getState().applyEvent('thread-1', {
         type: 'approval_requested',

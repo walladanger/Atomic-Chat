@@ -5,7 +5,7 @@ title: "Gate agent changes with local contract evidence"
 
 # 2026-07-29 — Gate agent changes with local contract evidence
 
-- **Context:** Atomic Chat had broad unit coverage but no single local gate,
+- **Context:** Radium Chat had broad unit coverage but no single local gate,
   no regression floor for critical files, and no executable compatibility
   contract for pinned inference binaries or moving registries. Several tests
   also rendered replacement fixtures instead of production entrypoints.

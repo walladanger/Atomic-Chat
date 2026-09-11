@@ -69,6 +69,10 @@ export const localStorageKey = {
   // the tier detection picked for this host. Written before the download starts
   // so a crash or a failure mid-download cannot retry on every launch.
   startupBackendUpgradeAttempt: 'startup-backend-upgrade-attempt',
+  // Configured media providers: descriptors plus the selected model. Holds no
+  // secrets - a descriptor may name where its credential lives
+  // (`auth.setting_key`) but never the credential itself.
+  mediaProviders: 'media-providers',
 }
 
 export const CACHE_EXPIRY_MS = 1000 * 60 * 60 * 24

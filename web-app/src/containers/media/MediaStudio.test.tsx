@@ -1,244 +1,166 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+/**
+ * The Media Studio, end to end over the real provider store.
+ *
+ * Before Task 11 this file mocked `useAtomicMediaJob` and asserted the v1 body
+ * the form submitted. That hook is gone: the job now lives in the module-scoped
+ * job manager and providers come from the provider store, so the test seeds the
+ * REAL store and lets the real form, preview and status components render.
+ *
+ * Only two things are stubbed, and neither is the subject:
+ *  - `useMediaGeneration`, so a job can be put into any state without a
+ *    provider on the other end of a socket.
+ *  - `useMediaJobAsset`, because materialising needs a filesystem. It has its
+ *    own seven tests; what matters here is that the Studio hands what it
+ *    returns to the preview.
+ */
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import { MediaStudio } from './MediaStudio'
+import { useMediaProviderStore } from '@/stores/media-provider-store'
+import { upcastV1Capabilities } from '@/services/media/contract'
+import type {
+  MediaJobSnapshot,
+  MediaProviderDescriptor,
+} from '@/services/media/contract'
+import type { MediaAsset } from '@/services/media/assets'
+import type { AtomicMediaCapabilities } from '@/services/atomicMedia/types'
+import fixture from '@/services/media/contract/__tests__/fixtures/worker-v1-capabilities.json'
 
-const submit = vi.fn()
-const refreshHealth = vi.fn()
-let hookState: Record<string, unknown>
+const PROVIDER = 'atomic-media-worker'
+const capabilities = upcastV1Capabilities(
+  fixture.payload as AtomicMediaCapabilities,
+  PROVIDER
+)
 
-const defaultCapabilities = {
-  contract_version: 1,
-  devices: [{ id: 'cuda:0', label: 'RTX 3090', backend: 'cuda' }],
-  models: [
-    {
-      id: 'registry-video',
-      label: 'Registry Video',
-      backend: 'comfyui',
-      installed: true,
-      kinds: ['text_to_video', 'image_to_video'],
-      resolutions: [
-        { width: 832, height: 480 },
-        { width: 1280, height: 704 },
-      ],
-      frame_rule: { modulus: 4, offset: 1, min: 17, max: 121 },
-      defaults: {
-        width: 832,
-        height: 480,
-        num_frames: 17,
-        fps: 12,
-        steps: 10,
-        guidance_scale: 5,
-      },
-      ranges: {
-        steps: { min: 1, max: 60 },
-        guidance_scale: { min: 0, max: 15 },
-        fps: { min: 8, max: 30 },
-      },
-      supports: {
-        negative_prompt: true,
-        seed: true,
-        input_image: true,
-      },
-      fitness: { status: 'recommended', required_device: 'cuda:0' },
-    },
-  ],
-  recommended: [
-    {
-      kind: 'text_to_video',
-      model_id: 'registry-video',
-      defaults: {
-        width: 832,
-        height: 480,
-        num_frames: 17,
-        fps: 12,
-        steps: 10,
-        guidance_scale: 5,
-      },
-    },
-  ],
+const descriptor: MediaProviderDescriptor = {
+  id: PROVIDER,
+  label: 'Radium Media Worker',
+  kind: 'local_worker',
+  adapter: 'atomic-media-worker',
+  enabled: true,
+  origin: 'builtin',
 }
 
-vi.mock('@/hooks/useAtomicMediaJob', () => ({
-  useAtomicMediaJob: () => hookState,
+const submit = vi.fn()
+const cancel = vi.fn()
+const refresh = vi.fn()
+let latest: (MediaJobSnapshot & { cancellable: boolean }) | undefined
+let asset: MediaAsset | null
+
+vi.mock('@/hooks/useMediaGeneration', () => ({
+  useMediaGeneration: () => ({
+    jobs: latest ? [latest] : [],
+    latest,
+    job: () => latest,
+    submit,
+    cancel,
+    canCancel: () => Boolean(latest?.cancellable),
+  }),
+}))
+
+vi.mock('@/hooks/useMediaJobAsset', () => ({
+  useMediaJobAsset: () => asset,
 }))
 
 vi.mock('@tauri-apps/api/core', () => ({
   convertFileSrc: (path: string) => `asset://${path}`,
 }))
 
-describe('MediaStudio', () => {
-  beforeEach(() => {
-    submit.mockReset()
-    refreshHealth.mockReset()
-    hookState = {
-      workerState: 'online',
-      workerHealth: {
-        service: 'atomic-media-worker',
-        version: '0.6.1',
-        status: 'ok',
-      },
-      job: null,
-      error: null,
-      capabilities: defaultCapabilities,
-      submit,
-      cancelPolling: vi.fn(),
-      refreshHealth,
-    }
-  })
+function seed(overrides: Partial<Parameters<typeof useMediaProviderStore.setState>[0]> = {}) {
+  useMediaProviderStore.setState({
+    providers: [descriptor],
+    capabilities: { [PROVIDER]: capabilities },
+    health: { [PROVIDER]: { state: 'online', version: '0.6.1' } },
+    errors: {},
+    selectedModelId: null,
+    refreshing: false,
+    refresh,
+    ...overrides,
+  } as never)
+}
 
-  it('renders the approved core generation controls', () => {
+beforeEach(() => {
+  submit.mockReset()
+  cancel.mockReset()
+  refresh.mockReset()
+  latest = undefined
+  asset = null
+  seed()
+})
+
+describe('MediaStudio', () => {
+  it('renders the schema-driven generation controls', () => {
     render(<MediaStudio />)
 
-    expect(screen.getByRole('heading', { name: 'Media Studio' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'Media Studio' })
+    ).toBeInTheDocument()
     expect(screen.getByLabelText('Prompt')).toBeInTheDocument()
     expect(screen.getByLabelText('Resolution')).toBeInTheDocument()
     expect(screen.getByLabelText('Frames')).toBeInTheDocument()
     expect(screen.getByLabelText('FPS')).toBeInTheDocument()
     expect(screen.getByLabelText('Steps')).toBeInTheDocument()
     expect(screen.getByLabelText('Guidance')).toBeInTheDocument()
-    expect(screen.getByLabelText('Seed')).toBeInTheDocument()
-    expect(screen.getByLabelText('Device')).toHaveValue('cuda:0')
     expect(screen.getByLabelText('Negative prompt')).toBeInTheDocument()
+    expect(screen.getByLabelText('Device')).toHaveValue('cuda:0')
   })
 
-  it('submits exact baseline registry settings from the form', () => {
+  it('names the model and the provider it belongs to', () => {
     render(<MediaStudio />)
 
-    // The payload must reflect what the form actually shows the user, not a
-    // coincidentally matching set of defaults.
-    expect(screen.getByLabelText('Resolution')).toHaveValue('832x480')
-    expect(screen.getByLabelText('Frames')).toHaveValue(17)
-    expect(screen.getByLabelText('Steps')).toHaveValue(10)
-    expect(screen.getByLabelText('FPS')).toHaveValue(12)
-    expect(screen.getByLabelText('Guidance')).toHaveValue(5)
+    expect(
+      screen.getByText('Registry Video · Radium Media Worker')
+    ).toBeInTheDocument()
+  })
+
+  it('offers a tab for every task the provider declares', () => {
+    render(<MediaStudio />)
+
+    const tabs = screen.getAllByRole('tab').map((node) => node.textContent)
+
+    // The fixture's one model declares both, and the hardcoded MODES list this
+    // replaced could only ever show what was compiled into it.
+    expect(tabs).toEqual(
+      (capabilities.tasks ?? []).map((task) => task.label ?? task.id)
+    )
+  })
+
+  it('submits a request routed to the provider that owns the model', () => {
+    render(<MediaStudio />)
 
     fireEvent.change(screen.getByLabelText('Prompt'), {
       target: { value: 'A red sports car exits a garage' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Generate' }))
 
-    expect(submit).toHaveBeenCalledWith({
-      kind: 'text_to_video',
-      prompt: 'A red sports car exits a garage',
+    expect(submit).toHaveBeenCalledTimes(1)
+    const request = submit.mock.calls[0]?.[0]
+    expect(request).toMatchObject({
+      provider_id: PROVIDER,
+      model_id: `${PROVIDER}:registry-video`,
+      task: 'text_to_video',
       device: 'cuda:0',
-      model_id: 'registry-video',
-      width: 832,
-      height: 480,
-      num_frames: 17,
-      steps: 10,
-      fps: 12,
-      guidance_scale: 5,
-    })
-  })
-
-  it('renders worker-declared models and submits the selected model id', () => {
-    hookState = {
-      ...hookState,
-      capabilities: {
-        contract_version: 1,
-        devices: [
-          { id: 'cuda:0', label: 'RTX 3090', backend: 'cuda' },
-          { id: 'cpu', label: 'CPU', backend: 'cpu' },
-        ],
-        models: [
-          {
-            id: 'second-registry-video',
-            label: 'Second Registry Video',
-            backend: 'comfyui',
-            installed: true,
-            kinds: ['text_to_video', 'image_to_video'],
-            resolutions: [{ width: 768, height: 512 }],
-            frame_rule: { modulus: 8, offset: 1, min: 9, max: 249 },
-            defaults: {
-              width: 768,
-              height: 512,
-              num_frames: 105,
-              fps: 24,
-              steps: 28,
-              guidance_scale: 3.5,
-            },
-            ranges: {
-              steps: { min: 1, max: 60 },
-              guidance_scale: { min: 0, max: 10 },
-              fps: { min: 8, max: 30 },
-            },
-            supports: {
-              negative_prompt: true,
-              seed: true,
-              input_image: true,
-            },
-            fitness: { status: 'recommended', required_device: 'cuda:0' },
-          },
-          {
-            id: 'unsupported-registry-video',
-            label: 'Unsupported Registry Video',
-            backend: 'comfyui',
-            installed: true,
-            kinds: ['text_to_video'],
-            resolutions: [{ width: 1280, height: 704 }],
-            defaults: {},
-            supports: {},
-            fitness: {
-              status: 'unsupported',
-              reason: 'Insufficient VRAM',
-            },
-          },
-        ],
-        recommended: [
-          {
-            kind: 'text_to_video',
-            model_id: 'second-registry-video',
-            defaults: {
-              width: 768,
-              height: 512,
-              num_frames: 105,
-              fps: 24,
-              steps: 28,
-              guidance_scale: 3.5,
-            },
-          },
-        ],
+      params: {
+        prompt: 'A red sports car exits a garage',
+        resolution: '832x480',
+        num_frames: 17,
+        fps: 12,
+        steps: 10,
+        guidance_scale: 5,
       },
-    }
-
-    render(<MediaStudio />)
-
-    expect(screen.getByLabelText('Model')).toHaveValue('second-registry-video')
-    expect(screen.getByText('Second Registry Video · Local Worker')).toBeInTheDocument()
-    expect(screen.getByLabelText('Resolution')).toHaveValue('768x512')
-    expect(screen.getByLabelText('Device')).toHaveValue('cuda:0')
-    expect(
-      screen.getByRole('option', { name: /Unsupported Registry Video/ })
-    ).toBeDisabled()
-
-    fireEvent.change(screen.getByLabelText('Prompt'), {
-      target: { value: 'A glass bird folds into light' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Generate' }))
-
-    expect(submit).toHaveBeenCalledWith({
-      kind: 'text_to_video',
-      prompt: 'A glass bird folds into light',
-      device: 'cuda:0',
-      model_id: 'second-registry-video',
-      width: 768,
-      height: 512,
-      num_frames: 105,
-      steps: 28,
-      fps: 24,
-      guidance_scale: 3.5,
     })
   })
 
-  it('rounds frame counts to the selected model rule before submitting', () => {
+  it('corrects the frame count in the field before it is submitted', () => {
     render(<MediaStudio />)
 
     const frames = screen.getByLabelText('Frames')
     fireEvent.change(frames, { target: { value: '20' } })
     fireEvent.blur(frames)
 
-    // The rule is 4n + 1, so 20 must be corrected to 21 in the field the user
-    // sees — not silently fixed up on the way out.
+    // The rule is 4n + 1, so 20 becomes 21 in the field the user sees - not
+    // silently fixed up on the way out.
     expect(frames).toHaveValue(21)
 
     fireEvent.change(screen.getByLabelText('Prompt'), {
@@ -246,54 +168,95 @@ describe('MediaStudio', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: 'Generate' }))
 
-    expect(submit).toHaveBeenCalledWith(
-      expect.objectContaining({
-        num_frames: 21,
-      })
-    )
+    expect(submit.mock.calls[0]?.[0]).toMatchObject({
+      params: expect.objectContaining({ num_frames: 21 }),
+    })
   })
 
-  it('shows worker-offline state and allows a health retry', () => {
-    hookState = {
-      ...hookState,
-      workerState: 'offline',
-      workerHealth: null,
+  it('reports each provider by name and retries just that one', () => {
+    seed({ health: { [PROVIDER]: { state: 'offline', detail: 'refused' } } })
+    render(<MediaStudio />)
+
+    // Scoped to the provider list: the label also appears in the header and in
+    // the provider select, and this is about the health row specifically.
+    const providerList = screen.getByRole('list')
+    expect(
+      within(providerList).getByText('Radium Media Worker')
+    ).toBeInTheDocument()
+    expect(within(providerList).getByText(/Offline/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+
+    expect(refresh).toHaveBeenCalledWith({ providerId: PROVIDER })
+  })
+
+  it('shows progress while a job runs', () => {
+    latest = {
+      client_job_id: 'job-1',
+      provider_id: PROVIDER,
+      state: 'running',
+      progress: 68,
+      cancellable: false,
     }
     render(<MediaStudio />)
 
-    expect(screen.getByText('Worker offline')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Retry worker' }))
-    expect(refreshHealth).toHaveBeenCalled()
+    expect(screen.getByText('68%')).toBeInTheDocument()
+    expect(screen.getByText('running')).toBeInTheDocument()
   })
 
-  it('renders progress and completed video output', () => {
-    hookState = {
-      ...hookState,
-      job: {
-        job_id: 'job-1',
-        status: 'running',
-        progress: 68,
-        selected_device: 'cuda:0',
+  it('offers Cancel only when the provider says it can cancel', () => {
+    latest = {
+      client_job_id: 'job-1',
+      provider_id: PROVIDER,
+      state: 'running',
+      progress: 10,
+      cancellable: true,
+    }
+    render(<MediaStudio />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    // The v1 cancel cleared a local timer and never told the worker (C11).
+    expect(cancel).toHaveBeenCalledWith('job-1')
+  })
+
+  it('previews the materialised asset, never the provider output path', () => {
+    latest = {
+      client_job_id: 'job-1',
+      provider_id: PROVIDER,
+      state: 'succeeded',
+      cancellable: false,
+    }
+    asset = {
+      asset_id: 'a1',
+      client_job_id: 'job-1',
+      media_type: 'video',
+      path: 'D:/AtomicMedia/outputs/jobs/job-1.mp4',
+      mime: 'video/mp4',
+      bytes: 100,
+      created_at: 0,
+      provenance: {
+        provider_id: PROVIDER,
+        model_id: `${PROVIDER}:registry-video`,
+        model_label: 'Registry Video',
+        task: 'text_to_video',
+        params: {},
+        app_version: 'test',
+        contract_version: 2,
       },
     }
-    const { rerender } = render(<MediaStudio />)
-    expect(screen.getByText('68%')).toBeInTheDocument()
+    render(<MediaStudio />)
 
-    hookState = {
-      ...hookState,
-      job: {
-        job_id: 'job-1',
-        status: 'succeeded',
-        kind: 'text_to_video',
-        output_path: 'D:/AtomicMedia/outputs/jobs/job-1.mp4',
-      },
-    }
-    rerender(<MediaStudio />)
-
-    const video = screen.getByTestId('media-video-preview')
-    expect(video).toHaveAttribute(
+    expect(screen.getByTestId('media-video-preview')).toHaveAttribute(
       'src',
       'asset://D:/AtomicMedia/outputs/jobs/job-1.mp4'
     )
+  })
+
+  it('asks every enabled provider for its health on arrival', () => {
+    render(<MediaStudio />)
+
+    // Health is never persisted, so a stale "online" can never be shown.
+    expect(refresh).toHaveBeenCalled()
   })
 })

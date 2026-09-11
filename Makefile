@@ -1,10 +1,10 @@
-# Makefile for Atomic Chat Electron App - Build, Lint, Test, and Clean
+# Makefile for Radium Chat Electron App - Build, Lint, Test, and Clean
 
 REPORT_PORTAL_URL ?= ""
 REPORT_PORTAL_API_KEY ?= ""
 REPORT_PORTAL_PROJECT_NAME ?= ""
-	REPORT_PORTAL_LAUNCH_NAME ?= "Atomic Chat App"
-REPORT_PORTAL_DESCRIPTION ?= "Atomic Chat App report"
+	REPORT_PORTAL_LAUNCH_NAME ?= "Radium Chat App"
+REPORT_PORTAL_DESCRIPTION ?= "Radium Chat App report"
 
 # Default target, does nothing
 all:
@@ -158,7 +158,7 @@ else
 endif
 
 # Dev workflow with CPU-only backend to test runtime GPU auto-download.
-# Clears downloaded backends from the Atomic Chat data folder
+# Clears downloaded backends from the Radium Chat data folder
 # (data\llamacpp-upstream\backends), starts with the upstream `win-cpu-x64`
 # build, then the llamacpp-upstream extension detects the GPU and downloads
 # the optimal backend (CUDA 12.4 / 13.1 / Vulkan) in the background — and
@@ -208,7 +208,7 @@ else
 	@echo "This target is for Windows only."
 endif
 
-# Full wipe of all Atomic Chat data on Windows — used to simulate a true
+# Full wipe of all Radium Chat data on Windows — used to simulate a true
 # first-launch as if the app had never been installed. Removes the four
 # default APPDATA / LOCALAPPDATA directories (see DEVELOP.md → "Where Atomic
 # Chat stores data on Windows"). Does NOT touch a custom data_folder if the
@@ -239,7 +239,7 @@ ifeq ($(CONFIRM),1)
 				Write-Host ('Not present: ' + $$p) -ForegroundColor Gray; \
 			} \
 		}; \
-		Write-Host 'Atomic Chat: full data wipe done.' -ForegroundColor Green; \
+		Write-Host 'Radium Chat: full data wipe done.' -ForegroundColor Green; \
 	"
 else
 	@powershell -NoProfile -ExecutionPolicy Bypass -Command "\
@@ -316,9 +316,9 @@ lint: install-and-build
 	yarn lint
 
 # Testing
-.PHONY: test test-all test-local test-web test-extensions test-rust stub-resources \
+.PHONY: test test-all test-local test-web test-extensions test-rust stub-resources app-icons \
 	test-selective-v2032 rebaseline-selective-v2032 stage-windows-backends verify-windows-backends \
-	typecheck verify-fast verify test-quality test-hardening-contracts \
+	typecheck verify-fast verify clippy-rust test-quality test-hardening-contracts \
 	test-coverage-critical capture-capabilities capture-hw-profile \
 	sync-upstream-baseline gen-amd-rocm-pci-ids test-live test-live-cloud mutants
 
@@ -331,6 +331,7 @@ test-extensions:
 		--include '@janhq/llamacpp-upstream-extension' \
 		--include '@janhq/mlx-extension' \
 		--include '@janhq/download-extension' \
+		--include '@janhq/assistant-extension' \
 		run test:run
 
 # Tauri validates bundle.resources and externalBin paths while compiling the
@@ -377,8 +378,63 @@ else
 	@[ -e src-tauri/resources/llamacpp-backend-upstream/test-placeholder ] || touch src-tauri/resources/llamacpp-backend-upstream/test-placeholder
 endif
 
+# tauri-build renders a Windows Resource file from icons/icon.ico while
+# compiling, and no TAURI_CONFIG override avoids it: narrowing bundle.icon to
+# the one tracked file still fails with "`icons/icon.ico` not found". Every icon
+# except icons/icon.png is a generated artefact excluded by .gitignore, so a
+# fresh checkout has none of them and test-rust cannot compile until they exist.
+# Generate them from the tracked master when the platform's required icon is
+# missing, and never overwrite a real local build.
+#
+# `tauri icon` also REWRITES its own input: it emits a 512x512 icons/icon.png
+# over the tracked 1024x1024 master. That is how the master silently lost half
+# its resolution once already, sitting in the tree as an unexplained diff. So
+# copy the master aside and restore it afterwards - generating icons must never
+# degrade the source they are generated from. icon.png is not listed in
+# bundle.icon, so restoring it cannot affect any build.
+#
+# The rewrite was measured on Windows. The darwin path additionally runs
+# scripts/build-macos-app-icon.py and has not been verified here, but a build
+# step must not rewrite a tracked source on any platform.
+app-icons:
+ifeq ($(OS),Windows_NT)
+	powershell -NoProfile -Command "\
+		if (Test-Path 'src-tauri/icons/icon.ico') { exit 0 }; \
+		$$master = Join-Path $$env:TEMP 'atomic-icon-master.png'; \
+		Copy-Item 'src-tauri/icons/icon.png' $$master -Force; \
+		yarn build:icon; \
+		$$rc = $$LASTEXITCODE; \
+		Copy-Item $$master 'src-tauri/icons/icon.png' -Force; \
+		Remove-Item $$master -Force; \
+		exit $$rc"
+else ifeq ($(shell uname -s),Darwin)
+	@[ -e src-tauri/icons/icon.icns ] || ( \
+		master=$$(mktemp); cp src-tauri/icons/icon.png "$$master"; \
+		yarn build:icon; rc=$$?; \
+		cp "$$master" src-tauri/icons/icon.png; rm -f "$$master"; \
+		exit $$rc )
+else
+	@[ -e src-tauri/icons/32x32.png ] || ( \
+		master=$$(mktemp); cp src-tauri/icons/icon.png "$$master"; \
+		yarn build:icon; rc=$$?; \
+		cp "$$master" src-tauri/icons/icon.png; rm -f "$$master"; \
+		exit $$rc )
+endif
+
+# AGENTS.md rule 4 requires cargo clippy for Rust work, but nothing enforced it
+# until 2026-09-10, which is how 60 findings accumulated unnoticed. Wired into
+# `verify` so the rule and the gate agree.
+#
+# --all-targets covers tests as well as the lib; -D warnings makes a new finding
+# a failure rather than a note nobody reads. Findings that are deliberate are
+# annotated with #[allow(...)] AND a reason at the site.
+clippy-rust: export TAURI_CONFIG := {"bundle":{"icon":["icons/icon.png"]}}
+clippy-rust: stub-resources app-icons
+	cargo clippy --manifest-path src-tauri/Cargo.toml --workspace --all-targets \
+		--no-default-features --features test-tauri -- -D warnings
+
 test-rust: export TAURI_CONFIG := {"bundle":{"icon":["icons/icon.png"]}}
-test-rust: stub-resources
+test-rust: stub-resources app-icons
 	cargo test --manifest-path src-tauri/Cargo.toml --no-default-features --features test-tauri -- --test-threads=1
 	cargo test --manifest-path src-tauri/plugins/tauri-plugin-hardware/Cargo.toml
 	cargo test --manifest-path src-tauri/plugins/tauri-plugin-llamacpp/Cargo.toml
@@ -438,7 +494,7 @@ stage-windows-backends:
 verify-windows-backends:
 	node scripts/stage-windows-backends.mjs --verify-only
 
-verify: verify-fast test-rust test-selective-v2032
+verify: verify-fast clippy-rust test-rust test-selective-v2032
 
 # Explicitly live capture commands. The caller supplies paths/identity so these
 # never download artifacts or mutate fixtures during a normal verification run.
@@ -1222,7 +1278,7 @@ build: install-and-build install-rust-targets
 #   1. yarn tauri build (universal-apple-darwin, macos-конфиг)
 #      — Tauri подписывает и нотаризует .app, создаёт и подписывает .dmg
 #   2. scripts/rename-dmg-volume.sh
-#      — переименовывает том DMG в "Atomic Chat v<version>"
+#      — переименовывает том DMG в "Radium Chat v<version>"
 #      — ломает только подпись DMG-контейнера; .app внутри остаётся нотаризованным
 #   3. scripts/notarize-dmg-macos.sh
 #      — восстанавливает подпись DMG + нотаризует + стейплит (если заданы APPLE_ID/PASSWORD/TEAM_ID)

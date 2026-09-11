@@ -1,4 +1,4 @@
-# Contributing to Atomic Chat Extensions
+# Contributing to Radium Chat Extensions
 
 [← Back to Main Contributing Guide](../CONTRIBUTING.md)
 

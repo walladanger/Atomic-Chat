@@ -7,12 +7,12 @@ set -euo pipefail
 # does not know about resources we inject outside `tauri.linux.conf.json`,
 # so we add the extras to its AppDir and repackage it below.
 #
-# Product name is "Atomic Chat" (with a space) — preserve quoting
+# Product name is "Radium Chat" (with a space) — preserve quoting
 # everywhere or the spaces will silently break the build.
 
 RUNTIME="./.cache/build-tools/type2-runtime-x86_64"
 RELEASE_CHANNEL=${RELEASE_CHANNEL:-"stable"}
-PRODUCT_NAME="Atomic Chat"
+PRODUCT_NAME="Radium Chat"
 
 command -v mksquashfs >/dev/null \
   || { echo "mksquashfs not found; install squashfs-tools."; exit 1; }

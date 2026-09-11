@@ -5,7 +5,7 @@
   <key>CFBundleIdentifier</key>
   <string>chat.atomic.app</string>
   <key>NSLocalNetworkUsageDescription</key>
-  <string>Atomic Chat needs local network access to connect to model servers running on your local network (e.g. a vLLM, Ollama, or LM Studio endpoint on your LAN).</string>
+  <string>Radium Chat needs local network access to connect to model servers running on your local network (e.g. a vLLM, Ollama, or LM Studio endpoint on your LAN).</string>
   <key>CFBundleURLTypes</key>
   <array>
     <dict>

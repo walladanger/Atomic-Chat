@@ -124,6 +124,12 @@ const ROW_MAX_CHARS: usize = 32;
 
 #[cfg(desktop)]
 #[inline]
+// Accepted rather than restructured. These are private pixel helpers where
+// positional colour channels are idiomatic, and the lint is a heuristic about
+// API shape. Grouping them would mean reshaping untested tray-icon drawing
+// code to satisfy a heuristic, risking a rendering regression for no user
+// benefit. Revisit if these ever grow a caller outside this module.
+#[allow(clippy::too_many_arguments)]
 fn put_pixel(buf: &mut [u8], x: u32, y: u32, width: u32, r: u8, g: u8, b: u8, a: u8) {
     let idx = ((y * width + x) * 4) as usize;
     buf[idx] = r;
@@ -137,6 +143,12 @@ fn put_pixel(buf: &mut [u8], x: u32, y: u32, width: u32, r: u8, g: u8, b: u8, a:
 /// fully obscuring it.
 #[cfg(desktop)]
 #[inline]
+// Accepted rather than restructured. These are private pixel helpers where
+// positional colour channels are idiomatic, and the lint is a heuristic about
+// API shape. Grouping them would mean reshaping untested tray-icon drawing
+// code to satisfy a heuristic, risking a rendering regression for no user
+// benefit. Revisit if these ever grow a caller outside this module.
+#[allow(clippy::too_many_arguments)]
 fn blend_pixel(buf: &mut [u8], x: u32, y: u32, width: u32, r: u8, g: u8, b: u8, a: u8) {
     if a == 0 {
         return;
@@ -263,6 +275,12 @@ pub fn render_dot(running: bool) -> Image<'static> {
 /// size in pixels; `radius` is the corner radius. Uses straight-alpha blending
 /// so the helper composes cleanly with other shapes already drawn into `buf`.
 #[cfg(desktop)]
+// Accepted rather than restructured. These are private pixel helpers where
+// positional colour channels are idiomatic, and the lint is a heuristic about
+// API shape. Grouping them would mean reshaping untested tray-icon drawing
+// code to satisfy a heuristic, risking a rendering regression for no user
+// benefit. Revisit if these ever grow a caller outside this module.
+#[allow(clippy::too_many_arguments)]
 fn draw_rounded_rect(
     buf: &mut [u8],
     canvas_w: u32,
@@ -320,7 +338,7 @@ pub fn render_copy_icon() -> Image<'static> {
         &mut buf,
         size,
         5 * SCALE,
-        1 * SCALE,
+        SCALE,
         8 * SCALE,
         10 * SCALE,
         radius,
@@ -469,7 +487,7 @@ pub async fn update_tray_status(app: AppHandle, payload: TrayStatusPayload) -> R
     if payload.server_running && !payload.server_url.is_empty() {
         handles
             .server_url_row
-            .set_text(&truncate_tail(&payload.server_url, ROW_MAX_CHARS))
+            .set_text(truncate_tail(&payload.server_url, ROW_MAX_CHARS))
             .map_err(|e| e.to_string())?;
         handles
             .server_url_row

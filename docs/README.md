@@ -6,7 +6,7 @@ This website is built using [Nextra](https://nextra.site/), a modern static webs
 
 We try to **keep routes consistent** to maintain SEO.
 
-- **`/guides/`**: Guides on how to use the Atomic Chat application. For end users who are directly using Atomic Chat.
+- **`/guides/`**: Guides on how to use the Radium Chat application. For end users who are directly using Radium Chat.
 
 - **`/developer/`**: Developer docs on how to extend Jan. These pages are about what people can build with our software.
 
@@ -18,7 +18,7 @@ We try to **keep routes consistent** to maintain SEO.
 
 ## How to Contribute
 
-Refer to the [Contributing Guide](https://github.com/janhq/jan/blob/main/CONTRIBUTING.md) for more comprehensive information on how to contribute to the Atomic Chat project.
+Refer to the [Contributing Guide](https://github.com/janhq/jan/blob/main/CONTRIBUTING.md) for more comprehensive information on how to contribute to the Radium Chat project.
 
 ### Pre-requisites and Installation
 

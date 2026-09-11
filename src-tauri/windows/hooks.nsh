@@ -1,4 +1,4 @@
-; Atomic Chat — NSIS installer hooks
+; Radium Chat — NSIS installer hooks
 ; Extends the default Tauri uninstaller to:
 ;   1. Kill helper processes that hold file locks BEFORE removing files.
 ;   2. Clean application data directories that live outside the Tauri-managed

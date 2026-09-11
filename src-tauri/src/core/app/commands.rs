@@ -23,7 +23,7 @@ fn fallback_test_data_folder() -> PathBuf {
             tempfile::Builder::new()
                 .prefix("atomic-chat-test-data-")
                 .tempdir()
-                .expect("failed to create temporary Atomic Chat test data directory")
+                .expect("failed to create temporary Radium Chat test data directory")
         });
         temp_dir.path().to_path_buf()
     })
@@ -84,7 +84,7 @@ pub fn resolve_config_file_path() -> PathBuf {
 /// Reads AppConfiguration from the config file; falls back to the default location.
 pub fn resolve_jan_data_folder() -> PathBuf {
     let config_file = resolve_config_file_path();
-    let app_name = std::env::var("APP_NAME").unwrap_or_else(|_| "Atomic Chat".to_string());
+    let app_name = std::env::var("APP_NAME").unwrap_or_else(|_| "Radium Chat".to_string());
     let data_dir = dirs::data_dir().unwrap_or_else(|| {
         let home = std::env::var("HOME")
             .or_else(|_| std::env::var("USERPROFILE"))
@@ -364,8 +364,8 @@ mod tests {
         let root = tempdir().unwrap();
 
         assert_eq!(
-            build_default_data_folder(root.path(), "Atomic Chat"),
-            root.path().join("Atomic Chat").join("data")
+            build_default_data_folder(root.path(), "Radium Chat"),
+            root.path().join("Radium Chat").join("data")
         );
     }
 
@@ -390,7 +390,7 @@ mod tests {
     fn falls_back_to_default_data_folder_without_valid_settings() {
         let root = tempdir().unwrap();
         let config_file = root.path().join(CONFIGURATION_FILE_NAME);
-        let default = root.path().join("Atomic Chat").join("data");
+        let default = root.path().join("Radium Chat").join("data");
 
         assert_eq!(
             resolve_data_folder_from_config(&config_file, &default),

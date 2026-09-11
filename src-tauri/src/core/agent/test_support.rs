@@ -117,6 +117,10 @@ pub(crate) struct RecordingFolderAccess {
     requests: Mutex<Vec<FolderAccessRequest>>,
 }
 
+// A deliberate recorder surface for tests: some of these are kept so a test can
+// express the case even when none currently does. Removing them would make the
+// next test that needs one re-add it.
+#[allow(dead_code)]
 impl RecordingFolderAccess {
     pub(crate) fn allow() -> Self {
         Self {
@@ -157,6 +161,10 @@ pub(crate) struct RecordingDesktop {
     notifications: Mutex<Vec<(String, String)>>,
 }
 
+// A deliberate recorder surface for tests: some of these are kept so a test can
+// express the case even when none currently does. Removing them would make the
+// next test that needs one re-add it.
+#[allow(dead_code)]
 impl RecordingDesktop {
     pub(crate) fn clipboard_writes(&self) -> Vec<String> {
         self.clipboard_writes

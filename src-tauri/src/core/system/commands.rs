@@ -194,9 +194,10 @@ pub async fn factory_reset<R: Runtime>(
     }
 
     // Reset the configuration
-    let mut default_config = AppConfiguration::default();
-    default_config.data_folder = default_data_folder_path(app_handle.clone());
-    default_config.autostart_preference = autostart_preference;
+    let default_config = AppConfiguration {
+        data_folder: default_data_folder_path(app_handle.clone()),
+        autostart_preference,
+    };
     let _ = update_app_configuration(app_handle.clone(), default_config);
 
     restart_app(&app_handle)
@@ -392,7 +393,7 @@ fn detect_windows_installer_type() -> String {
     use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
     use winreg::RegKey;
 
-    const PRODUCT: &str = "Atomic Chat";
+    const PRODUCT: &str = "Radium Chat";
     const UNINSTALL: &str = "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
 
     // NSIS (setup.exe) writes its uninstall key named after the product.
@@ -511,11 +512,18 @@ pub fn launch_claude_code_with_config(
         match std::fs::OpenOptions::new()
             .write(true)
             .create(true)
+            // truncate(false) is deliberate and load-bearing. This open is a
+            // WRITABILITY PROBE - the handle is discarded and the real write
+            // happens below - and the file is the user's shell profile. Setting
+            // truncate(true), which is the obvious reading of
+            // clippy::suspicious_open_options, would blank their .zshrc or
+            // .bashrc as a side effect of checking whether we may write to it.
+            .truncate(false)
             .open(&env_file_path)
         {
             Ok(_) => {
                 write_env_to_shell(&env_file_path, &env_vars)?;
-                return Ok(());
+                Ok(())
             }
             Err(_) => {
                 // Use admin privileges to write
@@ -559,7 +567,7 @@ pub fn launch_claude_code_with_config(
                     "Env vars written to {} with admin privileges",
                     env_file_path
                 );
-                return Ok(());
+                Ok(())
             }
         }
     } else if cfg!(target_os = "linux") {
@@ -574,17 +582,24 @@ pub fn launch_claude_code_with_config(
         match std::fs::OpenOptions::new()
             .write(true)
             .create(true)
+            // truncate(false) is deliberate and load-bearing. This open is a
+            // WRITABILITY PROBE - the handle is discarded and the real write
+            // happens below - and the file is the user's shell profile. Setting
+            // truncate(true), which is the obvious reading of
+            // clippy::suspicious_open_options, would blank their .zshrc or
+            // .bashrc as a side effect of checking whether we may write to it.
+            .truncate(false)
             .open(&env_file_path)
         {
             Ok(_) => {
                 write_env_to_shell(&env_file_path, &env_vars)?;
-                return Ok(());
+                Ok(())
             }
             Err(_) => {
                 let jan_config_dir = format!("{}/.config/jan", home_dir);
                 let ext = if shell_name == "bash" { "bash" } else { "zsh" };
                 let env_file = format!("{}/claude-code-env.{}", jan_config_dir, ext);
-                return Err(format!("NEED_PERMISSION:{}", env_file));
+                Err(format!("NEED_PERMISSION:{}", env_file))
             }
         }
     } else {
@@ -603,7 +618,7 @@ pub fn launch_claude_code_with_config(
         }
 
         log::info!("Environment variables set permanently in Windows registry.");
-        return Ok(());
+        Ok(())
     }
 }
 
@@ -616,14 +631,14 @@ pub struct CliInstallStatus {
 /// Name of the CLI command as it is installed on the user's PATH.
 pub const CLI_COMMAND_NAME: &str = "atomic-chat-cli";
 
-/// Name the CLI shipped under before the Atomic Chat rebrand. Older builds
+/// Name the CLI shipped under before the Radium Chat rebrand. Older builds
 /// installed it as plain `jan`, which collides with the unrelated Jan.ai CLI.
 const LEGACY_CLI_COMMAND_NAME: &str = "jan";
 
-/// Marker string embedded in every Atomic Chat CLI build. Used to confirm that a
+/// Marker string embedded in every Radium Chat CLI build. Used to confirm that a
 /// leftover `jan` binary on PATH was written by us before we remove it — a `jan`
 /// belonging to the actual Jan.ai app must never be touched.
-const CLI_OWNERSHIP_MARKER: &[u8] = b"Atomic Chat";
+const CLI_OWNERSHIP_MARKER: &[u8] = b"Radium Chat";
 
 /// Return true when `path` is a binary we shipped (contains [`CLI_OWNERSHIP_MARKER`]).
 fn is_our_cli_binary(path: &std::path::Path) -> bool {
@@ -670,13 +685,13 @@ fn remove_legacy_cli_binary(dir: &std::path::Path) {
     }
     if !is_our_cli_binary(&legacy) {
         log::info!(
-            "Leaving {} alone — not an Atomic Chat binary",
+            "Leaving {} alone — not an Radium Chat binary",
             legacy.display()
         );
         return;
     }
     match std::fs::remove_file(&legacy) {
-        Ok(()) => log::info!("Removed legacy Atomic Chat CLI at {}", legacy.display()),
+        Ok(()) => log::info!("Removed legacy Radium Chat CLI at {}", legacy.display()),
         Err(e) => log::warn!("Could not remove {}: {}", legacy.display(), e),
     }
 }
@@ -702,9 +717,7 @@ pub async fn check_jan_cli_installed() -> CliInstallStatus {
                 // `where` returns one path per line; pick the first that isn't a
                 // dev-build artifact (i.e. skip paths containing \target\)
                 raw.lines()
-                    .map(str::trim)
-                    .filter(|p| !p.is_empty() && !p.to_ascii_lowercase().contains("\\target\\"))
-                    .next()
+                    .map(str::trim).find(|p| !p.is_empty() && !p.to_ascii_lowercase().contains("\\target\\"))
                     .map(str::to_string)
                     // fall back to the raw first line if every path looks like a build dir
                     .or_else(|| {
@@ -751,7 +764,7 @@ pub fn install_jan_cli_sync<R: Runtime>(
     let dest = resource_bin_dir.join(dest_bin_name);
 
     if !bundled.exists() && !dest.exists() {
-        return Err("Atomic Chat CLI binary not bundled with this version of the app.".to_string());
+        return Err("Radium Chat CLI binary not bundled with this version of the app.".to_string());
     }
 
     #[cfg(windows)]
@@ -764,10 +777,10 @@ pub fn install_jan_cli_sync<R: Runtime>(
         // Older builds put `jan.exe` on PATH here; drop it so it stops shadowing Jan.ai.
         remove_legacy_cli_binary(&resource_bin_dir);
         add_to_path_windows(&resource_bin_dir)?;
-        return Ok(CliInstallStatus {
+        Ok(CliInstallStatus {
             installed: true,
             path: Some(dest.to_string_lossy().into_owned()),
-        });
+        })
     }
 
     #[cfg(unix)]
@@ -821,7 +834,7 @@ pub fn uninstall_jan_cli() -> Result<(), String> {
         }
         remove_legacy_cli_binary(&bin_dir);
         remove_from_path_windows(&bin_dir)?;
-        return Ok(());
+        Ok(())
     }
 
     #[cfg(unix)]
@@ -831,7 +844,7 @@ pub fn uninstall_jan_cli() -> Result<(), String> {
         if dest.exists() {
             std::fs::remove_file(&dest).map_err(|e| {
                 format!(
-                    "Failed to remove the Atomic Chat CLI from {}: {}",
+                    "Failed to remove the Radium Chat CLI from {}: {}",
                     dest.display(),
                     e
                 )
@@ -875,11 +888,18 @@ pub fn clear_claude_code_env() -> Result<(), String> {
         match std::fs::OpenOptions::new()
             .write(true)
             .create(true)
+            // truncate(false) is deliberate and load-bearing. This open is a
+            // WRITABILITY PROBE - the handle is discarded and the real write
+            // happens below - and the file is the user's shell profile. Setting
+            // truncate(true), which is the obvious reading of
+            // clippy::suspicious_open_options, would blank their .zshrc or
+            // .bashrc as a side effect of checking whether we may write to it.
+            .truncate(false)
             .open(&env_file_path)
         {
             Ok(_) => {
                 std::fs::write(&env_file_path, &cleaned).map_err(|e| e.to_string())?;
-                return Ok(());
+                Ok(())
             }
             Err(_) => {
                 // Write cleaned content to a temp file, then use osascript to move it
@@ -901,7 +921,7 @@ pub fn clear_claude_code_env() -> Result<(), String> {
                     "CC env cleared from {} with admin privileges",
                     env_file_path
                 );
-                return Ok(());
+                Ok(())
             }
         }
     } else if cfg!(target_os = "linux") {
@@ -918,6 +938,13 @@ pub fn clear_claude_code_env() -> Result<(), String> {
         match std::fs::OpenOptions::new()
             .write(true)
             .create(true)
+            // truncate(false) is deliberate and load-bearing. This open is a
+            // WRITABILITY PROBE - the handle is discarded and the real write
+            // happens below - and the file is the user's shell profile. Setting
+            // truncate(true), which is the obvious reading of
+            // clippy::suspicious_open_options, would blank their .zshrc or
+            // .bashrc as a side effect of checking whether we may write to it.
+            .truncate(false)
             .open(&env_file_path)
         {
             Ok(_) => {
@@ -967,7 +994,7 @@ fn jan_cli_bin_dir_windows() -> Result<PathBuf, String> {
         std::env::var("LOCALAPPDATA").map_err(|_| "Cannot determine LOCALAPPDATA".to_string())?;
     Ok(PathBuf::from(local_app_data)
         .join("Programs")
-        .join("Atomic Chat")
+        .join("Radium Chat")
         .join("resources")
         .join("bin"))
 }
@@ -995,7 +1022,7 @@ fn strip_verbatim_prefix(path: &str) -> String {
 
 /// Add a directory to the Windows user PATH.
 #[cfg(windows)]
-fn add_to_path_windows(install_dir: &PathBuf) -> Result<(), String> {
+fn add_to_path_windows(install_dir: &Path) -> Result<(), String> {
     use std::process::Command;
 
     // Always write the normalized (non-verbatim) form to PATH.
@@ -1091,7 +1118,7 @@ fn add_to_path_windows(install_dir: &PathBuf) -> Result<(), String> {
 
 /// Remove a directory from the Windows user PATH.
 #[cfg(windows)]
-fn remove_from_path_windows(dir: &PathBuf) -> Result<(), String> {
+fn remove_from_path_windows(dir: &Path) -> Result<(), String> {
     use std::process::Command;
 
     let dir_str = dir.to_string_lossy().to_string();
@@ -1383,7 +1410,7 @@ custom_providers: []
 ///
 /// On Windows the native installer (`install.ps1`) sets `HERMES_HOME` via
 /// `[Environment]::SetEnvironmentVariable(..., "User")` -- a registry write
-/// that is invisible to Atomic Chat's own already-running process (which only
+/// that is invisible to Radium Chat's own already-running process (which only
 /// sees the environment block snapshotted at its own startup). So
 /// `std::env::var("HERMES_HOME")` can be stale within the same app session
 /// that just installed Hermes. Reading the registry value directly first
@@ -1495,11 +1522,10 @@ fn split_custom_providers(content: &str) -> (Vec<String>, Vec<Vec<String>>, Vec<
     let mut current: Vec<String> = Vec::new();
 
     for line in &block_lines {
-        if line.starts_with("- ") {
-            if !current.is_empty() {
+        if line.starts_with("- ")
+            && !current.is_empty() {
                 entries.push(std::mem::take(&mut current));
             }
-        }
         if !line.trim().is_empty() {
             current.push(line.clone());
         }
@@ -1532,7 +1558,7 @@ fn rebuild_custom_providers(
 ) -> String {
     let mut result: Vec<String> = before.to_vec();
 
-    while result.last().map_or(false, |l| l.trim().is_empty()) {
+    while result.last().is_some_and(|l| l.trim().is_empty()) {
         result.pop();
     }
 
@@ -1619,7 +1645,7 @@ fn upsert_provider_request_timeout(content: &str, provider_id: &str, seconds: u3
 
     match providers_idx {
         None => {
-            while lines.last().map_or(false, |l| l.trim().is_empty()) {
+            while lines.last().is_some_and(|l| l.trim().is_empty()) {
                 lines.pop();
             }
             lines.push("providers:".to_string());
@@ -1632,13 +1658,12 @@ fn upsert_provider_request_timeout(content: &str, provider_id: &str, seconds: u3
             }
 
             // Extent of the providers block: until the next top-level key.
-            let mut block_end = lines.len();
-            for i in (pidx + 1)..lines.len() {
-                if is_top_level_yaml_key(&lines[i]) {
-                    block_end = i;
-                    break;
-                }
-            }
+            let block_end = lines
+                .iter()
+                .enumerate()
+                .skip(pidx + 1)
+                .find(|(_, line)| is_top_level_yaml_key(line))
+                .map_or(lines.len(), |(index, _)| index);
 
             // Find the provider sub-key at 2-space indent.
             let prov_idx = (pidx + 1..block_end).find(|&i| lines[i].trim_end() == prov_key_line);
@@ -1651,18 +1676,13 @@ fn upsert_provider_request_timeout(content: &str, provider_id: &str, seconds: u3
                 Some(pk) => {
                     // Extent of this provider's sub-block: until the next key at
                     // indent <= 2 (a sibling provider) or the block end.
-                    let mut sub_end = block_end;
-                    for i in (pk + 1)..block_end {
-                        let l = &lines[i];
-                        if l.trim().is_empty() {
-                            continue;
-                        }
-                        let indent = l.len() - l.trim_start().len();
-                        if indent <= 2 {
-                            sub_end = i;
-                            break;
-                        }
-                    }
+                    let sub_end = lines[..block_end]
+                        .iter()
+                        .enumerate()
+                        .skip(pk + 1)
+                        .filter(|(_, line)| !line.trim().is_empty())
+                        .find(|(_, line)| line.len() - line.trim_start().len() <= 2)
+                        .map_or(block_end, |(index, _)| index);
                     let has_field = (pk + 1..sub_end).any(|i| {
                         lines[i]
                             .trim_start()
@@ -1688,8 +1708,8 @@ fn upsert_provider_request_timeout(content: &str, provider_id: &str, seconds: u3
 // External coding-agent / assistant integrations (Launch page)
 // ---------------------------------------------------------------------------
 
-const ATOMIC_MANAGED_BEGIN: &str = "# >>> Atomic Chat (managed) >>>";
-const ATOMIC_MANAGED_END: &str = "# <<< Atomic Chat (managed) <<<";
+const ATOMIC_MANAGED_BEGIN: &str = "# >>> Radium Chat (managed) >>>";
+const ATOMIC_MANAGED_END: &str = "# <<< Radium Chat (managed) <<<";
 
 /// Resolve the user's home directory in a platform-aware way.
 fn agent_home_dir() -> Result<String, String> {
@@ -1700,7 +1720,7 @@ fn agent_home_dir() -> Result<String, String> {
     }
 }
 
-/// Remove every previously written `# >>> Atomic Chat (managed) >>> ... <<<`
+/// Remove every previously written `# >>> Radium Chat (managed) >>> ... <<<`
 /// block. Some agents (e.g. Codex) need two managed regions — a root-level
 /// activation key at the very top of the file and a tables block at the
 /// bottom — so this strips them all, not just the first.
@@ -2502,7 +2522,7 @@ pub async fn install_agent<R: Runtime>(
             return Err(format!(
                 "'{}' is required to install this agent but was not found on PATH. \
                  Install it (Node.js from https://nodejs.org for npm-based agents), \
-                 then restart Atomic Chat and try again: {}",
+                 then restart Radium Chat and try again: {}",
                 prereq, docs
             ));
         }
@@ -2713,7 +2733,7 @@ pub fn configure_opencode(
         "atomic".to_string(),
         serde_json::json!({
             "npm": "@ai-sdk/openai-compatible",
-            "name": "Atomic Chat",
+            "name": "Radium Chat",
             "options": { "baseURL": api_url, "apiKey": key_val },
             "models": serde_json::Value::Object(models),
         }),
@@ -2745,7 +2765,7 @@ fn openclaude_global_config_path(home: &str) -> PathBuf {
 /// (`~/.openclaude/.openclaude-profile.json`). OpenClaude explicitly does not
 /// read `~/.claude` / `~/.claude.json` (see its README's "OpenClaude config
 /// cutover" section), so there is no legacy path to fall back to. OpenClaude
-/// routes atomic-chat through its OpenAI-compatible shim; local Atomic Chat
+/// routes atomic-chat through its OpenAI-compatible shim; local Radium Chat
 /// needs no API key.
 #[tauri::command]
 pub fn configure_openclaude(
@@ -2784,7 +2804,7 @@ pub fn configure_openclaude(
 
     let profile_entry = serde_json::json!({
         "id": OPENCLAUDE_ATOMIC_PROFILE_ID,
-        "name": "Atomic Chat",
+        "name": "Radium Chat",
         "provider": "atomic-chat",
         "baseUrl": api_url,
         "model": model,
@@ -2894,7 +2914,7 @@ pub fn configure_mimo(
         "atomic".to_string(),
         serde_json::json!({
             "npm": "@ai-sdk/openai-compatible",
-            "name": "Atomic Chat",
+            "name": "Radium Chat",
             "options": { "baseURL": api_url, "apiKey": key_val },
             "models": serde_json::Value::Object(models),
         }),
@@ -2925,7 +2945,7 @@ pub fn configure_droid(
     model: String,
     api_key: Option<String>,
 ) -> Result<(), String> {
-    const DISPLAY_NAME: &str = "Atomic Chat";
+    const DISPLAY_NAME: &str = "Radium Chat";
 
     let home = agent_home_dir()?;
     let dir = PathBuf::from(&home).join(".factory");
@@ -3011,10 +3031,10 @@ pub fn configure_droid(
 }
 
 /// Display name (and provider id) of the custom provider we register in Zed.
-const ZED_PROVIDER_ID: &str = "Atomic Chat";
+const ZED_PROVIDER_ID: &str = "Radium Chat";
 
 /// Configure Zed by upserting a custom OpenAI-compatible provider named
-/// "Atomic Chat" under `language_models.openai_compatible` in
+/// "Radium Chat" under `language_models.openai_compatible` in
 /// `~/.config/zed/settings.json`, and (when a model is running) selecting it as
 /// the agent's default model.
 ///
@@ -3327,7 +3347,7 @@ pub fn configure_openclaw(
 }
 
 /// Configure Claude Code by upserting `~/.claude/settings.json` so it points at
-/// the local Atomic Chat server and uses the active model. Values go into the
+/// the local Radium Chat server and uses the active model. Values go into the
 /// `env` block — Claude reads it at startup regardless of how `claude` was
 /// launched, and `ANTHROPIC_MODEL` there overrides any stale top-level `model`.
 /// All other user settings are preserved.
@@ -3468,10 +3488,11 @@ pub fn copilot_env_vars(
     model: &str,
     api_key: Option<&str>,
 ) -> Vec<(String, String)> {
-    let mut env_vars: Vec<(String, String)> = Vec::with_capacity(5);
-    env_vars.push(("COPILOT_PROVIDER_BASE_URL".to_string(), api_url.to_string()));
-    env_vars.push(("COPILOT_PROVIDER_TYPE".to_string(), "openai".to_string()));
-    env_vars.push(("COPILOT_MODEL".to_string(), model.to_string()));
+    let mut env_vars: Vec<(String, String)> = vec![
+        ("COPILOT_PROVIDER_BASE_URL".to_string(), api_url.to_string()),
+        ("COPILOT_PROVIDER_TYPE".to_string(), "openai".to_string()),
+        ("COPILOT_MODEL".to_string(), model.to_string()),
+    ];
     env_vars.push(("COPILOT_OFFLINE".to_string(), "true".to_string()));
     if let Some(key) = api_key.filter(|k| !k.is_empty()) {
         env_vars.push(("COPILOT_PROVIDER_API_KEY".to_string(), key.to_string()));
@@ -3479,7 +3500,7 @@ pub fn copilot_env_vars(
     env_vars
 }
 
-/// Configure GitHub Copilot CLI to use the local Atomic Chat server via its BYOK
+/// Configure GitHub Copilot CLI to use the local Radium Chat server via its BYOK
 /// environment variables. Copilot has no provider config file — it reads these
 /// from the environment at launch — so we persist them to the user's shell rc
 /// (Windows: `setx`). The auto-opened terminal then sources them. `COPILOT_OFFLINE`
@@ -3492,7 +3513,7 @@ pub fn configure_copilot(
 ) -> Result<(), String> {
     let env_vars = copilot_env_vars(&api_url, &model, api_key.as_deref());
 
-    const MARKER: &str = "# Atomic Chat - Copilot CLI Config";
+    const MARKER: &str = "# Radium Chat - Copilot CLI Config";
 
     if cfg!(target_os = "windows") {
         for (key, value) in &env_vars {
@@ -3700,7 +3721,7 @@ fn dsh_route_node(api_url: &str, model: &str, with_key: bool) -> serde_yaml::Val
     let mut route = Mapping::new();
     route.insert(
         ykey("displayName"),
-        Value::String("Atomic Chat".to_string()),
+        Value::String("Radium Chat".to_string()),
     );
     route.insert(ykey("api"), Value::String("openai-completions".to_string()));
     route.insert(ykey("baseURL"), Value::String(api_url.to_string()));
@@ -4026,7 +4047,7 @@ fn configure_dsh_at(
     Ok(())
 }
 
-/// Point DeepSeek Harness (`dsh`) at the local Atomic Chat server by upserting
+/// Point DeepSeek Harness (`dsh`) at the local Radium Chat server by upserting
 /// the `llm-pi-ai.providers.atomic` route in `$DSH_HOME/settings.yaml`
 /// (default `~/.dsh`). dsh re-reads that document live, so no restart is needed.
 ///
@@ -4048,10 +4069,11 @@ pub fn configure_dsh(
 pub fn goose_env_vars(api_url: &str, model: &str, api_key: Option<&str>) -> Vec<(String, String)> {
     let key_val = api_key.filter(|k| !k.is_empty()).unwrap_or("atomic");
 
-    let mut env_vars: Vec<(String, String)> = Vec::with_capacity(5);
-    env_vars.push(("GOOSE_PROVIDER".to_string(), "openai".to_string()));
-    env_vars.push(("GOOSE_MODEL".to_string(), model.to_string()));
-    env_vars.push(("OPENAI_HOST".to_string(), api_url.to_string()));
+    let mut env_vars: Vec<(String, String)> = vec![
+        ("GOOSE_PROVIDER".to_string(), "openai".to_string()),
+        ("GOOSE_MODEL".to_string(), model.to_string()),
+        ("OPENAI_HOST".to_string(), api_url.to_string()),
+    ];
     env_vars.push((
         "OPENAI_BASE_PATH".to_string(),
         "v1/chat/completions".to_string(),
@@ -4074,7 +4096,7 @@ pub fn configure_goose(
 ) -> Result<(), String> {
     let env_vars = goose_env_vars(&api_url, &model, api_key.as_deref());
 
-    const MARKER: &str = "# Atomic Chat - Goose Config";
+    const MARKER: &str = "# Radium Chat - Goose Config";
 
     if cfg!(target_os = "windows") {
         for (key, value) in &env_vars {
@@ -4147,7 +4169,7 @@ pub fn configure_openhands(
 ) -> Result<(), String> {
     let env_vars = openhands_env_vars(&api_url, &model, api_key.as_deref());
 
-    const MARKER: &str = "# Atomic Chat - OpenHands Config";
+    const MARKER: &str = "# Radium Chat - OpenHands Config";
 
     if cfg!(target_os = "windows") {
         for (key, value) in &env_vars {
@@ -4242,7 +4264,7 @@ pub fn configure_kilo(
     provider.as_object_mut().unwrap().insert(
         "atomic".to_string(),
         serde_json::json!({
-            "name": "Atomic Chat",
+            "name": "Radium Chat",
             "npm": "@ai-sdk/openai-compatible",
             "options": { "baseURL": api_url, "apiKey": key_val },
             "models": serde_json::Value::Object(models),
@@ -4289,10 +4311,11 @@ pub fn poolside_env_vars(
     let key_val = api_key.filter(|k| !k.is_empty()).unwrap_or("atomic");
     let standalone_base = poolside_standalone_base_url(api_url);
 
-    let mut env_vars: Vec<(String, String)> = Vec::with_capacity(3);
-    env_vars.push(("POOLSIDE_STANDALONE_BASE_URL".to_string(), standalone_base));
-    env_vars.push(("POOLSIDE_API_KEY".to_string(), key_val.to_string()));
-    env_vars.push(("POOLSIDE_STANDALONE_MODEL".to_string(), model.to_string()));
+    let env_vars: Vec<(String, String)> = vec![
+        ("POOLSIDE_STANDALONE_BASE_URL".to_string(), standalone_base),
+        ("POOLSIDE_API_KEY".to_string(), key_val.to_string()),
+        ("POOLSIDE_STANDALONE_MODEL".to_string(), model.to_string()),
+    ];
     env_vars
 }
 
@@ -4305,7 +4328,7 @@ pub fn configure_poolside(
     let standalone_base = poolside_standalone_base_url(&api_url);
     let env_vars = poolside_env_vars(&api_url, &model, api_key.as_deref());
 
-    const MARKER: &str = "# Atomic Chat - Poolside Config";
+    const MARKER: &str = "# Radium Chat - Poolside Config";
 
     if cfg!(target_os = "windows") {
         for (key, value) in &env_vars {
@@ -4759,7 +4782,8 @@ mod tests {
             sanitized_appimage_restart_command(std::ffi::OsStr::new("/tmp/atomic-chat.AppImage"));
         let removed: Vec<_> = command
             .get_envs()
-            .filter_map(|(key, value)| value.is_none().then(|| key.to_os_string()))
+            .filter(|(_, value)| value.is_none())
+            .map(|(key, _)| key.to_os_string())
             .collect();
 
         for variable in APPIMAGE_RUNTIME_ENV_VARS {
@@ -4804,7 +4828,7 @@ mod dsh_tests {
         let r = route(&root);
         assert_eq!(r.get("api").unwrap().as_str(), Some("openai-completions"));
         assert_eq!(r.get("baseURL").unwrap().as_str(), Some(URL));
-        assert_eq!(r.get("displayName").unwrap().as_str(), Some("Atomic Chat"));
+        assert_eq!(r.get("displayName").unwrap().as_str(), Some("Radium Chat"));
 
         // A hand-declared route is refused by dsh without a non-empty model list.
         let models = r.get("models").unwrap().as_sequence().unwrap();
