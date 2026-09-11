@@ -21,15 +21,17 @@ pub struct AppConfiguration {
     // Add other fields as needed
 }
 
-impl AppConfiguration {
-    pub fn default() -> Self {
+impl Default for AppConfiguration {
+    fn default() -> Self {
         Self {
             data_folder: String::from("./data"), // Set a default value for the data_folder
             autostart_preference: AutostartPreference::Unmanaged,
             // Add other fields with default values as needed
         }
     }
+}
 
+impl AppConfiguration {
     /// A freshly created configuration. New installs no longer claim a Login
     /// Item / startup entry: the app has to open fast and cold, and autostart
     /// is opt-in from Settings. `PendingDefaultOn` is kept as a variant so

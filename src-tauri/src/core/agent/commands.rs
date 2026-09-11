@@ -242,7 +242,7 @@ async fn list_workspace_directory(
             .to_string();
         entries.push(AgentWorkspaceEntry {
             name: entry.file_name().to_string_lossy().into_owned(),
-            path: workspace_relative_path(&root, &entry_path)?,
+            path: workspace_relative_path(root, &entry_path)?,
             kind,
             size: metadata
                 .as_ref()
@@ -771,7 +771,7 @@ async fn resolve_workspace_candidate(root: &Path, relative: &str) -> Result<Path
     let candidate = tokio::fs::canonicalize(root.join(relative))
         .await
         .map_err(|error| format!("Could not resolve workspace path: {error}"))?;
-    if !candidate.starts_with(&root) {
+    if !candidate.starts_with(root) {
         return Err("Workspace path escapes the selected Agent workspace".into());
     }
     Ok(candidate)

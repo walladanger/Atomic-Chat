@@ -318,7 +318,7 @@ lint: install-and-build
 # Testing
 .PHONY: test test-all test-local test-web test-extensions test-rust stub-resources app-icons \
 	test-selective-v2032 rebaseline-selective-v2032 stage-windows-backends verify-windows-backends \
-	typecheck verify-fast verify test-quality test-hardening-contracts \
+	typecheck verify-fast verify clippy-rust test-quality test-hardening-contracts \
 	test-coverage-critical capture-capabilities capture-hw-profile \
 	sync-upstream-baseline gen-amd-rocm-pci-ids test-live test-live-cloud mutants
 
@@ -421,6 +421,18 @@ else
 		exit $$rc )
 endif
 
+# AGENTS.md rule 4 requires cargo clippy for Rust work, but nothing enforced it
+# until 2026-09-10, which is how 60 findings accumulated unnoticed. Wired into
+# `verify` so the rule and the gate agree.
+#
+# --all-targets covers tests as well as the lib; -D warnings makes a new finding
+# a failure rather than a note nobody reads. Findings that are deliberate are
+# annotated with #[allow(...)] AND a reason at the site.
+clippy-rust: export TAURI_CONFIG := {"bundle":{"icon":["icons/icon.png"]}}
+clippy-rust: stub-resources app-icons
+	cargo clippy --manifest-path src-tauri/Cargo.toml --workspace --all-targets \
+		--no-default-features --features test-tauri -- -D warnings
+
 test-rust: export TAURI_CONFIG := {"bundle":{"icon":["icons/icon.png"]}}
 test-rust: stub-resources app-icons
 	cargo test --manifest-path src-tauri/Cargo.toml --no-default-features --features test-tauri -- --test-threads=1
@@ -482,7 +494,7 @@ stage-windows-backends:
 verify-windows-backends:
 	node scripts/stage-windows-backends.mjs --verify-only
 
-verify: verify-fast test-rust test-selective-v2032
+verify: verify-fast clippy-rust test-rust test-selective-v2032
 
 # Explicitly live capture commands. The caller supplies paths/identity so these
 # never download artifacts or mutate fixtures during a normal verification run.

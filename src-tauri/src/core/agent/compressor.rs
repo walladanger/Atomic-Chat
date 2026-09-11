@@ -190,8 +190,8 @@ fn contains_case_sensitive_word(value: &str, needle: &str) -> bool {
 fn word_boundary(value: &str, index: usize, len: usize) -> bool {
     let before = value[..index].chars().next_back();
     let after = value[index + len..].chars().next();
-    before.map_or(true, |ch| !ch.is_alphanumeric() && ch != '_')
-        && after.map_or(true, |ch| !ch.is_alphanumeric() && ch != '_')
+    before.is_none_or(|ch| !ch.is_alphanumeric() && ch != '_')
+        && after.is_none_or(|ch| !ch.is_alphanumeric() && ch != '_')
 }
 
 fn take_chars(value: &str, max_chars: usize) -> String {

@@ -194,9 +194,10 @@ pub async fn factory_reset<R: Runtime>(
     }
 
     // Reset the configuration
-    let mut default_config = AppConfiguration::default();
-    default_config.data_folder = default_data_folder_path(app_handle.clone());
-    default_config.autostart_preference = autostart_preference;
+    let default_config = AppConfiguration {
+        data_folder: default_data_folder_path(app_handle.clone()),
+        autostart_preference,
+    };
     let _ = update_app_configuration(app_handle.clone(), default_config);
 
     restart_app(&app_handle)
@@ -511,11 +512,18 @@ pub fn launch_claude_code_with_config(
         match std::fs::OpenOptions::new()
             .write(true)
             .create(true)
+            // truncate(false) is deliberate and load-bearing. This open is a
+            // WRITABILITY PROBE - the handle is discarded and the real write
+            // happens below - and the file is the user's shell profile. Setting
+            // truncate(true), which is the obvious reading of
+            // clippy::suspicious_open_options, would blank their .zshrc or
+            // .bashrc as a side effect of checking whether we may write to it.
+            .truncate(false)
             .open(&env_file_path)
         {
             Ok(_) => {
                 write_env_to_shell(&env_file_path, &env_vars)?;
-                return Ok(());
+                Ok(())
             }
             Err(_) => {
                 // Use admin privileges to write
@@ -559,7 +567,7 @@ pub fn launch_claude_code_with_config(
                     "Env vars written to {} with admin privileges",
                     env_file_path
                 );
-                return Ok(());
+                Ok(())
             }
         }
     } else if cfg!(target_os = "linux") {
@@ -574,17 +582,24 @@ pub fn launch_claude_code_with_config(
         match std::fs::OpenOptions::new()
             .write(true)
             .create(true)
+            // truncate(false) is deliberate and load-bearing. This open is a
+            // WRITABILITY PROBE - the handle is discarded and the real write
+            // happens below - and the file is the user's shell profile. Setting
+            // truncate(true), which is the obvious reading of
+            // clippy::suspicious_open_options, would blank their .zshrc or
+            // .bashrc as a side effect of checking whether we may write to it.
+            .truncate(false)
             .open(&env_file_path)
         {
             Ok(_) => {
                 write_env_to_shell(&env_file_path, &env_vars)?;
-                return Ok(());
+                Ok(())
             }
             Err(_) => {
                 let jan_config_dir = format!("{}/.config/jan", home_dir);
                 let ext = if shell_name == "bash" { "bash" } else { "zsh" };
                 let env_file = format!("{}/claude-code-env.{}", jan_config_dir, ext);
-                return Err(format!("NEED_PERMISSION:{}", env_file));
+                Err(format!("NEED_PERMISSION:{}", env_file))
             }
         }
     } else {
@@ -603,7 +618,7 @@ pub fn launch_claude_code_with_config(
         }
 
         log::info!("Environment variables set permanently in Windows registry.");
-        return Ok(());
+        Ok(())
     }
 }
 
@@ -702,9 +717,7 @@ pub async fn check_jan_cli_installed() -> CliInstallStatus {
                 // `where` returns one path per line; pick the first that isn't a
                 // dev-build artifact (i.e. skip paths containing \target\)
                 raw.lines()
-                    .map(str::trim)
-                    .filter(|p| !p.is_empty() && !p.to_ascii_lowercase().contains("\\target\\"))
-                    .next()
+                    .map(str::trim).find(|p| !p.is_empty() && !p.to_ascii_lowercase().contains("\\target\\"))
                     .map(str::to_string)
                     // fall back to the raw first line if every path looks like a build dir
                     .or_else(|| {
@@ -764,10 +777,10 @@ pub fn install_jan_cli_sync<R: Runtime>(
         // Older builds put `jan.exe` on PATH here; drop it so it stops shadowing Jan.ai.
         remove_legacy_cli_binary(&resource_bin_dir);
         add_to_path_windows(&resource_bin_dir)?;
-        return Ok(CliInstallStatus {
+        Ok(CliInstallStatus {
             installed: true,
             path: Some(dest.to_string_lossy().into_owned()),
-        });
+        })
     }
 
     #[cfg(unix)]
@@ -821,7 +834,7 @@ pub fn uninstall_jan_cli() -> Result<(), String> {
         }
         remove_legacy_cli_binary(&bin_dir);
         remove_from_path_windows(&bin_dir)?;
-        return Ok(());
+        Ok(())
     }
 
     #[cfg(unix)]
@@ -875,11 +888,18 @@ pub fn clear_claude_code_env() -> Result<(), String> {
         match std::fs::OpenOptions::new()
             .write(true)
             .create(true)
+            // truncate(false) is deliberate and load-bearing. This open is a
+            // WRITABILITY PROBE - the handle is discarded and the real write
+            // happens below - and the file is the user's shell profile. Setting
+            // truncate(true), which is the obvious reading of
+            // clippy::suspicious_open_options, would blank their .zshrc or
+            // .bashrc as a side effect of checking whether we may write to it.
+            .truncate(false)
             .open(&env_file_path)
         {
             Ok(_) => {
                 std::fs::write(&env_file_path, &cleaned).map_err(|e| e.to_string())?;
-                return Ok(());
+                Ok(())
             }
             Err(_) => {
                 // Write cleaned content to a temp file, then use osascript to move it
@@ -901,7 +921,7 @@ pub fn clear_claude_code_env() -> Result<(), String> {
                     "CC env cleared from {} with admin privileges",
                     env_file_path
                 );
-                return Ok(());
+                Ok(())
             }
         }
     } else if cfg!(target_os = "linux") {
@@ -918,6 +938,13 @@ pub fn clear_claude_code_env() -> Result<(), String> {
         match std::fs::OpenOptions::new()
             .write(true)
             .create(true)
+            // truncate(false) is deliberate and load-bearing. This open is a
+            // WRITABILITY PROBE - the handle is discarded and the real write
+            // happens below - and the file is the user's shell profile. Setting
+            // truncate(true), which is the obvious reading of
+            // clippy::suspicious_open_options, would blank their .zshrc or
+            // .bashrc as a side effect of checking whether we may write to it.
+            .truncate(false)
             .open(&env_file_path)
         {
             Ok(_) => {
@@ -995,7 +1022,7 @@ fn strip_verbatim_prefix(path: &str) -> String {
 
 /// Add a directory to the Windows user PATH.
 #[cfg(windows)]
-fn add_to_path_windows(install_dir: &PathBuf) -> Result<(), String> {
+fn add_to_path_windows(install_dir: &Path) -> Result<(), String> {
     use std::process::Command;
 
     // Always write the normalized (non-verbatim) form to PATH.
@@ -1091,7 +1118,7 @@ fn add_to_path_windows(install_dir: &PathBuf) -> Result<(), String> {
 
 /// Remove a directory from the Windows user PATH.
 #[cfg(windows)]
-fn remove_from_path_windows(dir: &PathBuf) -> Result<(), String> {
+fn remove_from_path_windows(dir: &Path) -> Result<(), String> {
     use std::process::Command;
 
     let dir_str = dir.to_string_lossy().to_string();
@@ -1495,11 +1522,10 @@ fn split_custom_providers(content: &str) -> (Vec<String>, Vec<Vec<String>>, Vec<
     let mut current: Vec<String> = Vec::new();
 
     for line in &block_lines {
-        if line.starts_with("- ") {
-            if !current.is_empty() {
+        if line.starts_with("- ")
+            && !current.is_empty() {
                 entries.push(std::mem::take(&mut current));
             }
-        }
         if !line.trim().is_empty() {
             current.push(line.clone());
         }
@@ -1532,7 +1558,7 @@ fn rebuild_custom_providers(
 ) -> String {
     let mut result: Vec<String> = before.to_vec();
 
-    while result.last().map_or(false, |l| l.trim().is_empty()) {
+    while result.last().is_some_and(|l| l.trim().is_empty()) {
         result.pop();
     }
 
@@ -1619,7 +1645,7 @@ fn upsert_provider_request_timeout(content: &str, provider_id: &str, seconds: u3
 
     match providers_idx {
         None => {
-            while lines.last().map_or(false, |l| l.trim().is_empty()) {
+            while lines.last().is_some_and(|l| l.trim().is_empty()) {
                 lines.pop();
             }
             lines.push("providers:".to_string());
@@ -1632,13 +1658,12 @@ fn upsert_provider_request_timeout(content: &str, provider_id: &str, seconds: u3
             }
 
             // Extent of the providers block: until the next top-level key.
-            let mut block_end = lines.len();
-            for i in (pidx + 1)..lines.len() {
-                if is_top_level_yaml_key(&lines[i]) {
-                    block_end = i;
-                    break;
-                }
-            }
+            let block_end = lines
+                .iter()
+                .enumerate()
+                .skip(pidx + 1)
+                .find(|(_, line)| is_top_level_yaml_key(line))
+                .map_or(lines.len(), |(index, _)| index);
 
             // Find the provider sub-key at 2-space indent.
             let prov_idx = (pidx + 1..block_end).find(|&i| lines[i].trim_end() == prov_key_line);
@@ -1651,18 +1676,13 @@ fn upsert_provider_request_timeout(content: &str, provider_id: &str, seconds: u3
                 Some(pk) => {
                     // Extent of this provider's sub-block: until the next key at
                     // indent <= 2 (a sibling provider) or the block end.
-                    let mut sub_end = block_end;
-                    for i in (pk + 1)..block_end {
-                        let l = &lines[i];
-                        if l.trim().is_empty() {
-                            continue;
-                        }
-                        let indent = l.len() - l.trim_start().len();
-                        if indent <= 2 {
-                            sub_end = i;
-                            break;
-                        }
-                    }
+                    let sub_end = lines[..block_end]
+                        .iter()
+                        .enumerate()
+                        .skip(pk + 1)
+                        .filter(|(_, line)| !line.trim().is_empty())
+                        .find(|(_, line)| line.len() - line.trim_start().len() <= 2)
+                        .map_or(block_end, |(index, _)| index);
                     let has_field = (pk + 1..sub_end).any(|i| {
                         lines[i]
                             .trim_start()
@@ -3468,10 +3488,11 @@ pub fn copilot_env_vars(
     model: &str,
     api_key: Option<&str>,
 ) -> Vec<(String, String)> {
-    let mut env_vars: Vec<(String, String)> = Vec::with_capacity(5);
-    env_vars.push(("COPILOT_PROVIDER_BASE_URL".to_string(), api_url.to_string()));
-    env_vars.push(("COPILOT_PROVIDER_TYPE".to_string(), "openai".to_string()));
-    env_vars.push(("COPILOT_MODEL".to_string(), model.to_string()));
+    let mut env_vars: Vec<(String, String)> = vec![
+        ("COPILOT_PROVIDER_BASE_URL".to_string(), api_url.to_string()),
+        ("COPILOT_PROVIDER_TYPE".to_string(), "openai".to_string()),
+        ("COPILOT_MODEL".to_string(), model.to_string()),
+    ];
     env_vars.push(("COPILOT_OFFLINE".to_string(), "true".to_string()));
     if let Some(key) = api_key.filter(|k| !k.is_empty()) {
         env_vars.push(("COPILOT_PROVIDER_API_KEY".to_string(), key.to_string()));
@@ -4048,10 +4069,11 @@ pub fn configure_dsh(
 pub fn goose_env_vars(api_url: &str, model: &str, api_key: Option<&str>) -> Vec<(String, String)> {
     let key_val = api_key.filter(|k| !k.is_empty()).unwrap_or("atomic");
 
-    let mut env_vars: Vec<(String, String)> = Vec::with_capacity(5);
-    env_vars.push(("GOOSE_PROVIDER".to_string(), "openai".to_string()));
-    env_vars.push(("GOOSE_MODEL".to_string(), model.to_string()));
-    env_vars.push(("OPENAI_HOST".to_string(), api_url.to_string()));
+    let mut env_vars: Vec<(String, String)> = vec![
+        ("GOOSE_PROVIDER".to_string(), "openai".to_string()),
+        ("GOOSE_MODEL".to_string(), model.to_string()),
+        ("OPENAI_HOST".to_string(), api_url.to_string()),
+    ];
     env_vars.push((
         "OPENAI_BASE_PATH".to_string(),
         "v1/chat/completions".to_string(),
@@ -4289,10 +4311,11 @@ pub fn poolside_env_vars(
     let key_val = api_key.filter(|k| !k.is_empty()).unwrap_or("atomic");
     let standalone_base = poolside_standalone_base_url(api_url);
 
-    let mut env_vars: Vec<(String, String)> = Vec::with_capacity(3);
-    env_vars.push(("POOLSIDE_STANDALONE_BASE_URL".to_string(), standalone_base));
-    env_vars.push(("POOLSIDE_API_KEY".to_string(), key_val.to_string()));
-    env_vars.push(("POOLSIDE_STANDALONE_MODEL".to_string(), model.to_string()));
+    let env_vars: Vec<(String, String)> = vec![
+        ("POOLSIDE_STANDALONE_BASE_URL".to_string(), standalone_base),
+        ("POOLSIDE_API_KEY".to_string(), key_val.to_string()),
+        ("POOLSIDE_STANDALONE_MODEL".to_string(), model.to_string()),
+    ];
     env_vars
 }
 
@@ -4759,7 +4782,8 @@ mod tests {
             sanitized_appimage_restart_command(std::ffi::OsStr::new("/tmp/atomic-chat.AppImage"));
         let removed: Vec<_> = command
             .get_envs()
-            .filter_map(|(key, value)| value.is_none().then(|| key.to_os_string()))
+            .filter(|(_, value)| value.is_none())
+            .map(|(key, _)| key.to_os_string())
             .collect();
 
         for variable in APPIMAGE_RUNTIME_ENV_VARS {
