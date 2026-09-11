@@ -217,6 +217,56 @@ mod tests {
         MemoryCredentialStore::default()
     }
 
+    /// The REAL operating-system credential store.
+    ///
+    /// `#[ignore]` on purpose: every other test here runs against the in-memory
+    /// store so `cargo test` can never write to the machine running it. This one
+    /// deliberately does touch Windows Credential Manager / macOS Keychain /
+    /// Linux Secret Service, so it is opt-in:
+    ///
+    ///   cargo test --no-default-features --features test-tauri \
+    ///     --lib core::media::secrets::tests::os_credential_store_round_trip \
+    ///     -- --ignored --nocapture
+    ///
+    /// It cleans up after itself, and uses an obvious throwaway key so a failed
+    /// run leaves something recognisable rather than a mystery entry.
+    ///
+    /// This is the check tracker Evidence row 10 item 3 asks for.
+    #[test]
+    #[ignore = "touches the real OS credential store; run explicitly with --ignored"]
+    fn os_credential_store_round_trip() {
+        use super::os::OsCredentialStore;
+
+        let store = OsCredentialStore;
+        let key = "media.__radium_selftest__.api_key";
+
+        // Start from nothing, even if a previous run died mid-way.
+        let _ = store.delete(key);
+        assert_eq!(store.get(key).unwrap(), None, "should start absent");
+
+        store.set(key, "sk-selftest-first").unwrap();
+        assert_eq!(
+            store.get(key).unwrap(),
+            Some("sk-selftest-first".to_string()),
+            "the OS store should return what was written"
+        );
+
+        // Overwrite rather than duplicate - the case a user hits when they
+        // paste a new key over an old one.
+        store.set(key, "sk-selftest-second").unwrap();
+        assert_eq!(
+            store.get(key).unwrap(),
+            Some("sk-selftest-second".to_string()),
+            "a second write should replace, not duplicate"
+        );
+
+        store.delete(key).unwrap();
+        assert_eq!(store.get(key).unwrap(), None, "delete should remove it");
+
+        // Deleting again must not fail: removing a provider twice is ordinary.
+        assert!(store.delete(key).is_ok(), "delete should be idempotent");
+    }
+
     #[test]
     fn stores_and_returns_a_secret() {
         let store = store();
