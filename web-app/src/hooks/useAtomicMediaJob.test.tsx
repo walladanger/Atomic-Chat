@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAtomicMediaJob } from './useAtomicMediaJob'
 import type {
   AtomicMediaHealth,
+  AtomicMediaCapabilities,
   AtomicMediaJobRequest,
   AtomicMediaJobSnapshot,
 } from '@/services/atomicMedia/types'
@@ -15,13 +16,15 @@ type FakeClient = {
   getJob: ReturnType<
     typeof vi.fn<(jobId: string) => Promise<AtomicMediaJobSnapshot>>
   >
+  capabilities: ReturnType<
+    typeof vi.fn<() => Promise<AtomicMediaCapabilities | null>>
+  >
 }
 
 const request: AtomicMediaJobRequest = {
   kind: 'text_to_video',
   prompt: 'test',
   device: 'auto',
-  preset: 'wan2.2-ti2v-5b',
   width: 832,
   height: 480,
   num_frames: 17,
@@ -43,6 +46,12 @@ function makeClient(): FakeClient {
       kind: 'text_to_video',
     }),
     getJob: vi.fn(),
+    capabilities: vi.fn().mockResolvedValue({
+      contract_version: 1,
+      devices: [{ id: 'cuda:0', label: 'RTX 3090', backend: 'cuda' }],
+      models: [],
+      recommended: [],
+    }),
   }
 }
 
@@ -67,6 +76,21 @@ describe('useAtomicMediaJob', () => {
 
     expect(result.current.workerState).toBe('offline')
     expect(result.current.workerHealth).toBeNull()
+  })
+
+  it('loads worker capabilities after a successful health check', async () => {
+    const client = makeClient()
+    const { result } = renderHook(() => useAtomicMediaJob(client))
+
+    await act(async () => {
+      await result.current.refreshHealth()
+    })
+
+    expect(client.capabilities).toHaveBeenCalled()
+    expect(result.current.capabilities).toMatchObject({
+      contract_version: 1,
+      devices: [{ id: 'cuda:0', label: 'RTX 3090' }],
+    })
   })
 
   it('submits a job and polls queued to running to succeeded', async () => {
@@ -131,6 +155,12 @@ describe('useAtomicMediaJob', () => {
     await act(async () => {
       await result.current.submit(request)
     })
+
+    // Without this the assertion below could pass vacuously: if submit never
+    // established a non-terminal job, there would be no scheduled poll to cancel
+    // and getJob would stay uncalled for the wrong reason.
+    expect(result.current.job?.job_id).toBe('job-1')
+    expect(result.current.job?.status).toBe('queued')
 
     unmount()
     await act(async () => {

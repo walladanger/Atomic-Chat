@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { atomicMediaClient } from '@/services/atomicMedia/client'
 import type {
+  AtomicMediaCapabilities,
   AtomicMediaHealth,
   AtomicMediaJobRequest,
   AtomicMediaJobSnapshot,
@@ -8,7 +9,7 @@ import type {
 
 type AtomicMediaClientLike = Pick<
   typeof atomicMediaClient,
-  'health' | 'createJob' | 'getJob'
+  'health' | 'capabilities' | 'createJob' | 'getJob'
 >
 
 export type AtomicMediaWorkerState = 'checking' | 'online' | 'offline'
@@ -27,6 +28,8 @@ export function useAtomicMediaJob(
   const [workerState, setWorkerState] =
     useState<AtomicMediaWorkerState>('checking')
   const [workerHealth, setWorkerHealth] = useState<AtomicMediaHealth | null>(null)
+  const [capabilities, setCapabilities] =
+    useState<AtomicMediaCapabilities | null>(null)
   const [job, setJob] = useState<AtomicMediaJobSnapshot | null>(null)
   const [error, setError] = useState<string | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -47,10 +50,21 @@ export function useAtomicMediaJob(
       if (disposedRef.current) return null
       setWorkerHealth(health)
       setWorkerState(health.status === 'ok' ? 'online' : 'offline')
+      if (health.status === 'ok') {
+        try {
+          const nextCapabilities = await client.capabilities()
+          if (!disposedRef.current) setCapabilities(nextCapabilities)
+        } catch {
+          if (!disposedRef.current) setCapabilities(null)
+        }
+      } else {
+        setCapabilities(null)
+      }
       return health
     } catch {
       if (disposedRef.current) return null
       setWorkerHealth(null)
+      setCapabilities(null)
       setWorkerState('offline')
       return null
     }
@@ -118,6 +132,7 @@ export function useAtomicMediaJob(
   return {
     workerState,
     workerHealth,
+    capabilities,
     job,
     error,
     submit,

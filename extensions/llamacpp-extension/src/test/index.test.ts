@@ -3,9 +3,10 @@ import llamacpp_extension from '../index'
 
 import {
   getSupportedFeaturesFromRust,
+  installBundledBackendArchive,
   normalizeLlamacppConfig,
 } from '../../../../src-tauri/plugins/tauri-plugin-llamacpp/guest-js/index'
-import { listSupportedBackends } from '../backend'
+import { isBackendInstalled, listSupportedBackends } from '../backend'
 import { getSystemInfo } from '../hardware'
 
 // Mock fetch globally
@@ -49,6 +50,7 @@ vi.mock(
     return {
       ...actual,
       getSupportedFeaturesFromRust: vi.fn(),
+      installBundledBackendArchive: vi.fn(),
       findLatestVersionForBackend: vi.fn(),
       mapOldBackendToNew: vi.fn(),
       removeOldBackendVersions: vi.fn(),
@@ -74,6 +76,34 @@ describe('llamacpp_extension', () => {
       expect(extension.provider).toBe('llamacpp')
       expect(extension.providerId).toBe('llamacpp')
       expect(extension.autoUnload).toBe(false)
+    })
+  })
+
+  describe('bundled backend archives', () => {
+    it('uses an exact bundled backend before resolving a remote download', async () => {
+      const { getJanDataFolderPath, joinPath } = await import('@janhq/core')
+      vi.mocked(isBackendInstalled).mockResolvedValue(false)
+      vi.mocked(getJanDataFolderPath).mockResolvedValue('/data')
+      vi.mocked(joinPath).mockImplementation(async (parts: string[]) =>
+        parts.join('/')
+      )
+      vi.mocked(installBundledBackendArchive).mockResolvedValue({
+        installed: true,
+        backend_string: 'b10269-1.5.1/windows-x64-cuda-12.4',
+        version: 'b10269-1.5.1',
+        backend: 'windows-x64-cuda-12.4',
+      })
+
+      await extension['downloadAndInstallBackend'](
+        'b10269-1.5.1/windows-x64-cuda-12.4'
+      )
+
+      expect(installBundledBackendArchive).toHaveBeenCalledWith(
+        '/data/llamacpp/backends',
+        'b10269-1.5.1',
+        'windows-x64-cuda-12.4'
+      )
+      expect(global.fetch).not.toHaveBeenCalled()
     })
   })
 

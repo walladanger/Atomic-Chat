@@ -12,7 +12,6 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SystemMonitorRouteImport } from './routes/system-monitor'
 import { Route as MediaRouteImport } from './routes/media'
 import { Route as LogsRouteImport } from './routes/logs'
-import { Route as CodeRouteImport } from './routes/code'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SkillsIndexRouteImport } from './routes/skills/index'
 import { Route as LaunchIndexRouteImport } from './routes/launch/index'
@@ -50,11 +49,6 @@ const MediaRoute = MediaRouteImport.update({
 const LogsRoute = LogsRouteImport.update({
   id: '/logs',
   path: '/logs',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CodeRoute = CodeRouteImport.update({
-  id: '/code',
-  path: '/code',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -176,7 +170,6 @@ const SettingsProvidersProviderNameRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/code': typeof CodeRoute
   '/logs': typeof LogsRoute
   '/media': typeof MediaRoute
   '/system-monitor': typeof SystemMonitorRoute
@@ -205,7 +198,6 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/code': typeof CodeRoute
   '/logs': typeof LogsRoute
   '/media': typeof MediaRoute
   '/system-monitor': typeof SystemMonitorRoute
@@ -235,7 +227,6 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/code': typeof CodeRoute
   '/logs': typeof LogsRoute
   '/media': typeof MediaRoute
   '/system-monitor': typeof SystemMonitorRoute
@@ -266,7 +257,6 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/code'
     | '/logs'
     | '/media'
     | '/system-monitor'
@@ -295,7 +285,6 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/code'
     | '/logs'
     | '/media'
     | '/system-monitor'
@@ -324,7 +313,6 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
-    | '/code'
     | '/logs'
     | '/media'
     | '/system-monitor'
@@ -354,7 +342,6 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  CodeRoute: typeof CodeRoute
   LogsRoute: typeof LogsRoute
   MediaRoute: typeof MediaRoute
   SystemMonitorRoute: typeof SystemMonitorRoute
@@ -403,13 +390,6 @@ declare module '@tanstack/react-router' {
       path: '/logs'
       fullPath: '/logs'
       preLoaderRoute: typeof LogsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/code': {
-      id: '/code'
-      path: '/code'
-      fullPath: '/code'
-      preLoaderRoute: typeof CodeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -578,7 +558,6 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  CodeRoute: CodeRoute,
   LogsRoute: LogsRoute,
   MediaRoute: MediaRoute,
   SystemMonitorRoute: SystemMonitorRoute,

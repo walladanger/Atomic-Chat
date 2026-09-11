@@ -54,6 +54,9 @@ src-tauri/resources/llamacpp-backend/*
 !src-tauri/resources/llamacpp-backend-upstream/
 src-tauri/resources/llamacpp-backend-upstream/*
 !src-tauri/resources/llamacpp-backend-upstream/.gitkeep
+!src-tauri/resources/backend-packages/
+src-tauri/resources/backend-packages/*
+!src-tauri/resources/backend-packages/.gitkeep
 src-tauri/resources/lib
 src-tauri/resources/bin
 src-tauri/icons/*

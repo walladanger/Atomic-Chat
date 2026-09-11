@@ -10,6 +10,7 @@ lives behind a link — follow the link when the task needs it.
 | Dev loop, data folders, troubleshooting | [`DEVELOP.md`](DEVELOP.md)                        |
 | Product overview, install, API examples | [`README.md`](README.md)                          |
 | Contribution conventions                | [`CONTRIBUTING.md`](CONTRIBUTING.md)              |
+| **Atomic Media work — read first**      | [tracker](docs/superpowers/plans/2026-09-08-model-agnostic-atomic-media-platform-tracker.xlsx) + [plan](docs/superpowers/plans/2026-09-08-model-agnostic-atomic-media-platform.md) |
 
 ---
 
@@ -167,6 +168,11 @@ defaults on conflict.
 8. **Record non-trivial decisions** as a new file in `docs/decisions/`
    (architecture, backend selection, perf trade-off, security default, schema
    or migration). Same session, before you finish. See §7.
+9. **Touching Atomic Media?** Open the tracker linked at the top of this file
+   *before* writing anything, work the first row that is not Done, and update
+   its Status in the same commit. Task 0 is a hard gate — `make verify` is red
+   until it lands, and decision Q1 is the user's call, not yours. Starting cold?
+   Use [the kickoff prompt](docs/superpowers/plans/2026-09-08-media-platform-agent-prompt.md).
 
 ---
 

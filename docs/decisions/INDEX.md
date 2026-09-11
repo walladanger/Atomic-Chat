@@ -15,7 +15,6 @@ decision is reversed, add a new one that says which record it supersedes.
 
 ## Load-bearing — read before touching platform / provider / agent code
 
-- **2026-09-04** — [Route Atomic Code through configurable model candidates](2026-09-04-route-atomic-code-through-configurable-model-candidates.md)
 - **2026-08-13** — [Mirror and sign upstream llama.cpp releases in atomic-chat-conf](2026-08-13-mirror-and-sign-upstream-llama-cpp-in-atomic-chat-conf.md)
 - **2026-08-13** — [Add Windows ROCm to the upstream backend matrix](2026-08-13-add-windows-rocm-to-the-upstream-backend-matrix.md)
 - **2026-07-28** — [Ship dual llama providers on Windows and Linux](2026-07-28-ship-dual-llama-providers-on-windows-and-linux.md)

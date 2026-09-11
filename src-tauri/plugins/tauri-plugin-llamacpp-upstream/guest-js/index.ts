@@ -389,6 +389,18 @@ export async function installBundledBackend(
   return invoke('plugin:llamacpp-upstream|install_bundled_backend', { backendsDir })
 }
 
+export async function installBundledBackendArchive(
+  backendsDir: string,
+  version: string,
+  backend: string
+): Promise<BundledBackendResult> {
+  return invoke('plugin:llamacpp-upstream|install_bundled_backend_archive', {
+    backendsDir,
+    version,
+    backend,
+  })
+}
+
 /**
  * Make the binaries under `<backendDir>/build/bin/` executable and run
  * `llama-server --version`, resolving to whether the build it reports matches

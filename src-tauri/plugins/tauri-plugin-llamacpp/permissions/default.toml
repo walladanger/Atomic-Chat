@@ -40,5 +40,6 @@ permissions = [
     "allow-validate-backend-string",
     "allow-should-migrate-backend",
     "allow-handle-setting-update",
-    "allow-install-bundled-backend"
+    "allow-install-bundled-backend",
+    "allow-install-bundled-backend-archive"
 ]

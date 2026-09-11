@@ -1,20 +1,29 @@
+import { useState } from 'react'
 import { MediaGenerationForm } from './MediaGenerationForm'
 import { MediaJobStatus } from './MediaJobStatus'
 import { MediaPreview } from './MediaPreview'
 import { useAtomicMediaJob } from '@/hooks/useAtomicMediaJob'
-import type { AtomicMediaJobRequest } from '@/services/atomicMedia/types'
+import type {
+  AtomicMediaJobRequest,
+  AtomicMediaModel,
+} from '@/services/atomicMedia/types'
 
 export function MediaStudio() {
   const {
     workerState,
     workerHealth,
+    capabilities,
     job,
     error,
     submit,
     refreshHealth,
   } = useAtomicMediaJob()
+  const [selectedModel, setSelectedModel] = useState<AtomicMediaModel | null>(null)
 
   const generationBusy = job?.status === 'queued' || job?.status === 'running'
+  const headerLabel = selectedModel
+    ? `${selectedModel.label} · Local Worker`
+    : 'Atomic Media Worker'
 
   const handleSubmit = async (request: AtomicMediaJobRequest) => {
     await submit(request)
@@ -33,7 +42,7 @@ export function MediaStudio() {
             </h1>
           </div>
           <div className="rounded-full border border-border/60 bg-background px-3 py-1.5 text-xs text-muted-foreground shadow-sm">
-            Wan 2.2 · Local Worker
+            {headerLabel}
           </div>
         </div>
       </div>
@@ -41,7 +50,9 @@ export function MediaStudio() {
       <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-5">
         <div className="mx-auto grid w-full max-w-[1500px] gap-4 lg:grid-cols-[minmax(320px,0.82fr)_minmax(440px,1.45fr)]">
           <MediaGenerationForm
+            capabilities={capabilities}
             disabled={generationBusy || workerState === 'offline'}
+            onSelectedModelChange={setSelectedModel}
             onSubmit={handleSubmit}
           />
 

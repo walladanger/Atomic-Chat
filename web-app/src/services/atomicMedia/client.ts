@@ -14,7 +14,6 @@ export const ATOMIC_MEDIA_DEFAULT_VIDEO_REQUEST: Omit<
 > = {
   kind: 'text_to_video',
   device: 'auto',
-  preset: 'wan2.2-ti2v-5b',
   width: 832,
   height: 480,
   num_frames: 17,

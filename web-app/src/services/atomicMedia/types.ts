@@ -16,7 +16,86 @@ export type AtomicMediaHealth = {
   status: string
 }
 
-export type AtomicMediaCapabilities = Record<string, unknown>
+export type AtomicMediaDevice = {
+  id: string
+  label: string
+  backend?: string
+  vram_total_mb?: number
+  vram_free_mb?: number
+}
+
+export type AtomicMediaResolution = {
+  width: number
+  height: number
+}
+
+export type AtomicMediaFrameRule = {
+  modulus: number
+  offset: number
+  min: number
+  max: number
+}
+
+export type AtomicMediaNumericRange = {
+  min: number
+  max: number
+}
+
+export type AtomicMediaModelFitness = {
+  status: 'recommended' | 'runnable' | 'degraded' | 'unsupported'
+  reason?: string | null
+  required_device?: string | null
+  notes?: string[]
+}
+
+export type AtomicMediaModel = {
+  id: string
+  label: string
+  repo?: string
+  backend?: string
+  installed?: boolean
+  kinds: AtomicMediaJobKind[]
+  resolutions?: AtomicMediaResolution[]
+  frame_rule?: AtomicMediaFrameRule
+  defaults?: Partial<{
+    width: number
+    height: number
+    num_frames: number
+    fps: number
+    steps: number
+    guidance_scale: number
+  }>
+  ranges?: Partial<{
+    num_frames: AtomicMediaNumericRange
+    fps: AtomicMediaNumericRange
+    steps: AtomicMediaNumericRange
+    guidance_scale: AtomicMediaNumericRange
+  }>
+  supports?: Partial<{
+    negative_prompt: boolean
+    seed: boolean
+    input_image: boolean
+  }>
+  fitness?: AtomicMediaModelFitness
+}
+
+export type AtomicMediaRecommendation = {
+  kind: AtomicMediaJobKind
+  model_id: string
+  defaults?: AtomicMediaModel['defaults']
+}
+
+export type AtomicMediaCapabilities = {
+  contract_version?: number
+  backends?: Array<{
+    id: string
+    available: boolean
+    version?: string
+  }>
+  devices?: AtomicMediaDevice[]
+  models?: AtomicMediaModel[]
+  recommended?: AtomicMediaRecommendation[]
+}
 
 export type AtomicMediaJobRequest = {
   kind: AtomicMediaJobKind

@@ -317,6 +317,7 @@ lint: install-and-build
 
 # Testing
 .PHONY: test test-all test-local test-web test-extensions test-rust stub-resources \
+	test-selective-v2032 rebaseline-selective-v2032 stage-windows-backends verify-windows-backends \
 	typecheck verify-fast verify test-quality test-hardening-contracts \
 	test-coverage-critical capture-capabilities capture-hw-profile \
 	sync-upstream-baseline gen-amd-rocm-pci-ids test-live test-live-cloud mutants
@@ -424,7 +425,20 @@ verify-fast:
 	"$(MAKE)" test-hardening-contracts
 	"$(MAKE)" test-coverage-critical
 
-verify: verify-fast test-rust
+test-selective-v2032:
+	node --test tests/verify-selective-v2032.test.mjs
+	node scripts/verify-selective-v2032.mjs
+
+rebaseline-selective-v2032:
+	node scripts/rebaseline-selective-v2032.mjs
+
+stage-windows-backends:
+	node scripts/stage-windows-backends.mjs
+
+verify-windows-backends:
+	node scripts/stage-windows-backends.mjs --verify-only
+
+verify: verify-fast test-rust test-selective-v2032
 
 # Explicitly live capture commands. The caller supplies paths/identity so these
 # never download artifacts or mutate fixtures during a normal verification run.
