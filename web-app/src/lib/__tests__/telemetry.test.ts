@@ -1,14 +1,27 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   attachmentExt,
   chatHttpStatus,
   classifyChatFailure,
+  classifyDownloadFailure,
+  classifyModelLoadFailure,
   ctxUsedBucket,
   ctxUsedPercent,
+  execBackend,
+  execBackendForModel,
   finalizeChatTurnOnce,
+  gpuOffloadBucket,
   lengthBucket,
+  markModelDownloaded,
+  modelLoadSource,
+  normalizeModelId,
+  rememberExecBackend,
+  resetDownloadedModelsForTests,
+  resetExecBackendsForTests,
+  resetModelLoadThrottlesForTests,
   shouldEmitChatFailure,
+  shouldEmitModelLoadSuccess,
   toolNameForAnalytics,
 } from '@/lib/telemetry'
 
@@ -233,5 +246,264 @@ describe('shouldEmitChatFailure', () => {
   it('keys a missing model id consistently', () => {
     expect(shouldEmitChatFailure(null, 'unknown')).toBe(true)
     expect(shouldEmitChatFailure(undefined, 'unknown')).toBe(false)
+  })
+})
+
+describe('normalizeModelId', () => {
+  it('makes one model one string across platforms', () => {
+    // Local ids are minted by slicing a filesystem path, so Windows builds
+    // older than 06eafa9f1 produced the backslash spelling — and PostHog read
+    // the two as different models, one at 11.8% download success and the
+    // other at 95.1%.
+    expect(normalizeModelId('unsloth\\gemma-4-E4B-it-IQ4_XS')).toBe(
+      'unsloth/gemma-4-E4B-it-IQ4_XS'
+    )
+    expect(normalizeModelId('unsloth/gemma-4-E4B-it-IQ4_XS')).toBe(
+      'unsloth/gemma-4-E4B-it-IQ4_XS'
+    )
+  })
+
+  it('handles nested paths and absent ids', () => {
+    expect(normalizeModelId('a\\b\\c')).toBe('a/b/c')
+    expect(normalizeModelId(null)).toBeNull()
+    expect(normalizeModelId('')).toBeNull()
+  })
+})
+
+describe('classifyModelLoadFailure', () => {
+  it('calls a macOS Metal OOM an OOM', () => {
+    // 2251 events across 124 devices arrive as LLAMA_CPP_PROCESS_ERROR with
+    // the cause only in the stderr tail, against 16 carrying OUT_OF_MEMORY —
+    // so anything keyed on the code alone was blind to the platform.
+    expect(
+      classifyModelLoadFailure(
+        'LLAMA_CPP_PROCESS_ERROR',
+        'ggml_metal_graph_compute: command buffer 0 failed',
+        true
+      )
+    ).toBe('oom')
+  })
+
+  it('trusts the code when there is one', () => {
+    expect(classifyModelLoadFailure('BINARY_NOT_FOUND', null, false)).toBe(
+      'binary_missing'
+    )
+    expect(
+      classifyModelLoadFailure('LOCAL_API_SERVER_START_TIMEOUT', null, false)
+    ).toBe('timeout')
+    expect(
+      classifyModelLoadFailure('MODEL_ARCH_NOT_SUPPORTED', null, false)
+    ).toBe('arch_unsupported')
+  })
+
+  it('still classifies the 68% of failures that carry no code', () => {
+    expect(
+      classifyModelLoadFailure(null, 'llama-server: no such file', false)
+    ).toBe('binary_missing')
+    expect(
+      classifyModelLoadFailure(null, 'model.gguf: no such file', false)
+    ).toBe('model_file_missing')
+    expect(
+      classifyModelLoadFailure(null, 'unknown projector type: foo', false)
+    ).toBe('arch_unsupported')
+    expect(classifyModelLoadFailure(null, 'process exited with 139', false)).toBe(
+      'process_crash'
+    )
+  })
+
+  it('says unknown rather than guessing', () => {
+    expect(classifyModelLoadFailure(null, null, false)).toBe('unknown')
+    expect(classifyModelLoadFailure('SOMETHING_NEW', 'odd', false)).toBe(
+      'unknown'
+    )
+  })
+})
+
+describe('model_source', () => {
+  beforeEach(() => {
+    resetDownloadedModelsForTests()
+  })
+
+  it('remembers a download across app restarts', () => {
+    markModelDownloaded('unsloth/gemma-4-E4B-it-IQ4_XS')
+
+    // The marker used to live in memory only, so a model downloaded yesterday
+    // reported `local_disk` today and `local_disk` could not be read as "the
+    // user imported this".
+    expect(modelLoadSource('unsloth/gemma-4-E4B-it-IQ4_XS')).toBe('download')
+    expect(
+      JSON.parse(localStorage.getItem('telemetry-downloaded-models') ?? '[]')
+    ).toHaveLength(1)
+  })
+
+  it('matches the same model across path separators', () => {
+    markModelDownloaded('unsloth/gemma-4-E4B-it-IQ4_XS')
+
+    expect(modelLoadSource('unsloth\\gemma-4-E4B-it-IQ4_XS')).toBe('download')
+  })
+
+  it('reports anything unseen as already on disk', () => {
+    expect(modelLoadSource('never/downloaded')).toBe('local_disk')
+  })
+})
+
+describe('shouldEmitModelLoadSuccess', () => {
+  beforeEach(() => {
+    resetModelLoadThrottlesForTests()
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
+  })
+
+  it('bounds an oscillating load that keeps succeeding', () => {
+    // Only failures were throttled, which is how one device came to produce
+    // 62.9% of every model_load event in the project.
+    expect(shouldEmitModelLoadSuccess('m', 'llamacpp')).toBe(true)
+    expect(shouldEmitModelLoadSuccess('m', 'llamacpp')).toBe(false)
+
+    vi.advanceTimersByTime(61_000)
+    expect(shouldEmitModelLoadSuccess('m', 'llamacpp')).toBe(true)
+    vi.useRealTimers()
+  })
+
+  it('keeps a different model or backend separate', () => {
+    expect(shouldEmitModelLoadSuccess('m', 'llamacpp')).toBe(true)
+    expect(shouldEmitModelLoadSuccess('other', 'llamacpp')).toBe(true)
+    expect(shouldEmitModelLoadSuccess('m', 'mlx')).toBe(true)
+    vi.useRealTimers()
+  })
+
+  it('evicts oldest-first instead of forgetting everything at once', () => {
+    // The old `clear()` on overflow meant a device with many models wiped its
+    // whole window and started emitting freely — the exact devices the
+    // throttle exists to bound.
+    expect(shouldEmitModelLoadSuccess('first', 'llamacpp')).toBe(true)
+    for (let i = 0; i < 500; i += 1) {
+      shouldEmitModelLoadSuccess(`filler-${i}`, 'llamacpp')
+    }
+
+    // `first` was evicted, so it is emittable again — but the most recent
+    // entries are still held.
+    expect(shouldEmitModelLoadSuccess('filler-499', 'llamacpp')).toBe(false)
+    vi.useRealTimers()
+  })
+})
+
+describe('gpuOffloadBucket', () => {
+  it('reports what actually reached the GPU, not what was asked for', () => {
+    // `n_gpu_layers` reads 100 on 98.3% of events — the "offload everything"
+    // sentinel — so this is the only field that answers "GPU or CPU".
+    expect(gpuOffloadBucket({ gpu_layers_offloaded: 33, total_layers: 33 })).toBe(
+      'full'
+    )
+    expect(gpuOffloadBucket({ gpu_layers_offloaded: 12, total_layers: 33 })).toBe(
+      'partial'
+    )
+    // A CUDA build that silently degraded to CPU. Previously indistinguishable
+    // from a healthy GPU load.
+    expect(gpuOffloadBucket({ gpu_layers_offloaded: 0, total_layers: 33 })).toBe(
+      'none'
+    )
+  })
+
+  it('says unknown rather than guessing when the log said nothing', () => {
+    expect(gpuOffloadBucket(null)).toBe('unknown')
+    expect(gpuOffloadBucket({})).toBe('unknown')
+    // Offloaded but no total: still definitely on the GPU, extent unknown.
+    expect(gpuOffloadBucket({ gpu_layers_offloaded: 20 })).toBe('partial')
+  })
+})
+
+describe('execBackend', () => {
+  it('groups device indices together', () => {
+    expect(execBackend({ primary_device: 'CUDA0' })).toBe('cuda')
+    expect(execBackend({ primary_device: 'Vulkan0' })).toBe('vulkan')
+    expect(execBackend({ primary_device: 'Metal' })).toBe('metal')
+    expect(execBackend({ primary_device: 'CPU' })).toBe('cpu')
+  })
+
+  it('falls back to the loaded libraries, then to nothing', () => {
+    expect(execBackend({ loaded_backends: ['CUDA', 'CPU'] })).toBe('cuda')
+    expect(execBackend({})).toBeNull()
+    expect(execBackend(null)).toBeNull()
+  })
+})
+
+describe('execBackendForModel', () => {
+  beforeEach(() => {
+    resetExecBackendsForTests()
+  })
+
+  it('names the backend that computed, for a local provider', () => {
+    rememberExecBackend('unsloth/gemma', 'cuda')
+
+    expect(execBackendForModel('unsloth/gemma', 'llamacpp')).toBe('cuda')
+    // Same model, Windows spelling.
+    expect(execBackendForModel('unsloth\\gemma', 'llamacpp')).toBe('cuda')
+  })
+
+  it('says nothing for a remote provider', () => {
+    rememberExecBackend('gpt-5', 'cuda')
+
+    // The bug this replaces: `active_backend` was a device super-property, so
+    // it rode along on Pollinations (44/44) and OpenAI (31/49) responses and
+    // inverted the CPU-versus-GPU speed comparison.
+    expect(execBackendForModel('gpt-5', 'openai')).toBeNull()
+    expect(execBackendForModel('gpt-5', 'pollinations')).toBeNull()
+  })
+
+  it('forgets a model whose load reported no device', () => {
+    rememberExecBackend('m', 'cuda')
+    rememberExecBackend('m', null)
+
+    expect(execBackendForModel('m', 'llamacpp')).toBeNull()
+  })
+})
+
+describe('classifyDownloadFailure', () => {
+  it('reads the subcause tag the downloader attaches (ATO-467)', () => {
+    // `disk_io` was one bucket over 647 devices; the Rust side now names which
+    // filesystem fault it actually was, derived from the OS error code.
+    expect(
+      classifyDownloadFailure('Error: [disk_full] No space left on device (os error 28)')
+    ).toBe('disk_full')
+    expect(
+      classifyDownloadFailure('Error: [disk_permission] Permission denied (os error 13)')
+    ).toBe('disk_permission')
+    expect(
+      classifyDownloadFailure('Error: [disk_file_locked] The process cannot access the file')
+    ).toBe('disk_file_locked')
+    expect(
+      classifyDownloadFailure('Error: [disk_path_too_long] File path is 274 characters')
+    ).toBe('disk_path_too_long')
+    expect(
+      classifyDownloadFailure('Error: [disk_device_lost] The device is not ready')
+    ).toBe('disk_device_lost')
+  })
+
+  it('keeps the tag out of the way of cancellation', () => {
+    // A user-cancelled download must not be counted as a disk failure.
+    expect(classifyDownloadFailure('Download cancelled')).toBe('cancelled')
+  })
+
+  it('falls back to the old heuristics for untagged errors', () => {
+    // Clients that predate the tag, and every non-filesystem failure.
+    expect(classifyDownloadFailure('Error: os error 5 while writing')).toBe(
+      'disk_io'
+    )
+    expect(classifyDownloadFailure('Failed to get file size: HTTP status 404')).toBe(
+      'http_404'
+    )
+    expect(classifyDownloadFailure('connection reset by peer')).toBe('network')
+    expect(classifyDownloadFailure(undefined)).toBe('unknown')
+  })
+
+  it('does not invent an enum value for an unknown tag', () => {
+    // A future or malformed tag must never reach PostHog as a new value. It
+    // falls through to the heuristics, which land it in the `disk_io`
+    // catch-all — where it would have gone before the split anyway.
+    expect(classifyDownloadFailure('Error: [disk_wat] something new')).toBe(
+      'disk_io'
+    )
+    expect(classifyDownloadFailure('Error: [weird_tag] xyz')).toBe('unknown')
   })
 })

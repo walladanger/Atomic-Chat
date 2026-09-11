@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { localStorageKey } from '@/constants/localStorage'
+import { EMBEDDING_MODEL_ID } from '@/constants/models'
+import { useProviderRegistryStore } from '@/stores/provider-registry-store'
 
 import {
+  describeProviderState,
   hasValidProviders,
   isOnboardingPending,
   resetForcedOnboardingRun,
@@ -19,6 +22,69 @@ describe('onboarding provider gate', () => {
 
   it('treats an upstream provider with a model as usable', () => {
     expect(hasValidProviders([upstreamProvider])).toBe(true)
+  })
+
+  it('counts an MLX model on disk as usable', () => {
+    expect(
+      hasValidProviders([{ provider: 'mlx', models: [{ id: 'local' }] }])
+    ).toBe(true)
+  })
+
+  // The mechanism behind ATO-452: an install with only a broken link or the
+  // bundled embedder used to pass the gate, skip onboarding, and then have
+  // nothing to answer with on its first send.
+  it('does not count a broken link as a model', () => {
+    expect(
+      hasValidProviders([
+        { provider: 'llamacpp-upstream', models: [{ id: 'gone', missing: true }] },
+      ])
+    ).toBe(false)
+  })
+
+  it('does not count the embedding model as something to chat with', () => {
+    expect(
+      hasValidProviders([
+        { provider: 'llamacpp-upstream', models: [{ id: EMBEDDING_MODEL_ID }] },
+      ])
+    ).toBe(false)
+  })
+
+  it('does not count a model behind a switched-off provider', () => {
+    expect(
+      hasValidProviders([{ ...upstreamProvider, active: false }])
+    ).toBe(false)
+  })
+
+  it('does not count a cloud provider without a key', () => {
+    useProviderRegistryStore.setState({
+      providers: [{ provider: 'openai' }] as never,
+      hasInitialized: true,
+    })
+    expect(
+      hasValidProviders([
+        { provider: 'openai', models: [{ id: 'gpt' }], api_key: '' },
+      ])
+    ).toBe(false)
+    expect(
+      hasValidProviders([
+        { provider: 'openai', models: [], api_key: 'sk-test' },
+      ])
+    ).toBe(true)
+  })
+
+  it('judges a custom provider by loadable models, not list length', () => {
+    useProviderRegistryStore.setState({
+      providers: [],
+      hasInitialized: true,
+    } as never)
+    expect(
+      hasValidProviders([
+        { provider: 'my-server', models: [{ id: 'gone', missing: true }] },
+      ])
+    ).toBe(false)
+    expect(
+      hasValidProviders([{ provider: 'my-server', models: [{ id: 'fine' }] }])
+    ).toBe(true)
   })
 
   it('does not keep legacy upstream users in onboarding without a setup flag', () => {
@@ -70,5 +136,89 @@ describe('forced onboarding runs', () => {
     resetForcedOnboardingRun()
 
     expect(localStorage.getItem(localStorageKey.setupCompleted)).toBe('true')
+  })
+})
+
+describe('describeProviderState', () => {
+  beforeEach(() => {
+    useProviderRegistryStore.setState({
+      providers: [],
+      hasInitialized: false,
+    } as never)
+  })
+
+  it('separates a model on disk from a configured cloud key', () => {
+    expect(
+      describeProviderState([
+        { provider: 'llamacpp', models: [{ id: 'local' }] },
+        { provider: 'openai', models: [], api_key: '' },
+      ])
+    ).toMatchObject({ hadLocalModelOnDisk: true, hadCloudKey: false })
+
+    expect(
+      describeProviderState([
+        { provider: 'llamacpp', models: [] },
+        { provider: 'openai', models: [], api_key: 'sk-test' },
+      ])
+    ).toMatchObject({ hadLocalModelOnDisk: false, hadCloudKey: true })
+  })
+
+  it('counts MLX models as being on disk', () => {
+    expect(
+      describeProviderState([{ provider: 'mlx', models: [{ id: 'local' }] }])
+    ).toMatchObject({ hadLocalModelOnDisk: true })
+  })
+
+  it('does not count a broken link or the embedder as being on disk', () => {
+    expect(
+      describeProviderState([
+        {
+          provider: 'llamacpp',
+          models: [{ id: 'gone', missing: true }, { id: EMBEDDING_MODEL_ID }],
+        },
+      ])
+    ).toMatchObject({ hadLocalModelOnDisk: false })
+  })
+
+  it('reports the gate verbatim, so a disagreement with it stays visible', () => {
+    // A registered cloud provider with a key satisfies the gate but puts
+    // nothing on disk — exactly the split `had_any_model` used to hide.
+    useProviderRegistryStore.setState({
+      providers: [{ provider: 'openai' }] as never,
+      hasInitialized: true,
+    })
+
+    expect(
+      describeProviderState([
+        { provider: 'openai', models: [], api_key: 'sk-test' },
+      ])
+    ).toEqual({
+      hadLocalModelOnDisk: false,
+      hadCloudKey: true,
+      gateValidProviders: true,
+    })
+  })
+
+  it('reports an install that left with nothing at all', () => {
+    // The case the old `had_any_model` could not express: providers exist and
+    // the picker had rows, but nothing is on disk and no key is set.
+    expect(
+      describeProviderState([
+        { provider: 'llamacpp', models: [] },
+        { provider: 'openai', models: [] },
+      ])
+    ).toEqual({
+      hadLocalModelOnDisk: false,
+      hadCloudKey: false,
+      gateValidProviders: false,
+    })
+  })
+
+  it('does not count a local provider as a cloud key', () => {
+    expect(
+      describeProviderState([
+        { provider: 'llamacpp', models: [], api_key: 'unused' },
+      ])
+    ).toMatchObject({ hadCloudKey: false })
   })
 })

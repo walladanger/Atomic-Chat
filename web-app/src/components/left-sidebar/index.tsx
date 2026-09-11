@@ -1,22 +1,15 @@
-import { DownloadManagement } from '@/containers/DownloadManegement'
 import { NavChats } from './NavChats'
 import { NavMain } from './NavMain'
 import { NavProjects } from './NavProjects'
-import { useLeftPanel } from '@/hooks/useLeftPanel'
-import { cn, isLlamacppProvider } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import { useTranslation } from '@/i18n/react-i18next-compat'
-import { useAgentMode, type SidebarMode } from '@/hooks/useAgentMode'
-import { useModelProvider } from '@/hooks/useModelProvider'
-import { ChatAgentModeSwitch } from '@/containers/ChatAgentModeSwitch'
-import { TEMPORARY_CHAT_ID } from '@/constants/chat'
-import { localStorageKey } from '@/constants/localStorage'
 import { route } from '@/constants/routes'
-import { Link, useLocation, useNavigate } from '@tanstack/react-router'
+import { Link, useLocation } from '@tanstack/react-router'
 import {
   SettingsIcon,
   type SettingsIconHandle,
 } from '@/components/animated-icon/settings'
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
 
 import {
   Sidebar,
@@ -32,29 +25,8 @@ import {
 
 export function LeftSidebar() {
   const { t } = useTranslation()
-  const isLeftPanelOpen = useLeftPanel((state) => state.open)
-  const navigate = useNavigate()
   const { pathname } = useLocation()
-  const sidebarMode = useAgentMode((state) => state.sidebarMode)
-  const setSidebarMode = useAgentMode((state) => state.setSidebarMode)
-  const selectedProvider = useModelProvider((state) => state.selectedProvider)
-  const isAgentProviderSelected = isLlamacppProvider(selectedProvider)
   const settingsIconRef = useRef<SettingsIconHandle>(null)
-  const [showAgentAttention, setShowAgentAttention] = useState(
-    () =>
-      localStorage.getItem(localStorageKey.agentModeAttentionSeen) !== 'true'
-  )
-
-  const selectMode = (mode: SidebarMode) => {
-    if (mode === 'agent' && !isAgentProviderSelected) return
-    if (mode === 'agent' && showAgentAttention) {
-      localStorage.setItem(localStorageKey.agentModeAttentionSeen, 'true')
-      setShowAgentAttention(false)
-    }
-    setSidebarMode(mode)
-    useAgentMode.getState().setAgentMode(TEMPORARY_CHAT_ID, mode === 'agent')
-    navigate({ to: route.home })
-  }
 
   return (
     <div className="relative z-50">
@@ -67,12 +39,12 @@ export function LeftSidebar() {
           sidebar toggle) is right-aligned, so it sits well clear of the
           left-edge traffic-light cluster and can share the same Y-coord
           with the system buttons. We therefore keep that row at the top
-          and instead push only the left-aligned Radium Chat logo row
+          and instead push only the left-aligned Atomic Chat logo row
           below the traffic-light band, so it doesn't collide.
         */}
         <SidebarHeader className="flex flex-col gap-1 px-1 pb-0">
-          {/* SidebarTrigger and DownloadManagement are <button> elements that
-              Tauri's drag handler explicitly excludes, so they remain clickable. */}
+          {/* SidebarTrigger is a <button> element that Tauri's drag handler
+              explicitly excludes, so it remains clickable. */}
           <div
             className={cn(
               'flex w-full items-center',
@@ -86,7 +58,6 @@ export function LeftSidebar() {
               </span>
             )}
             <div className="flex items-center">
-              {isLeftPanelOpen && <DownloadManagement />}
               <SidebarTrigger className="text-muted-foreground rounded-full hover:bg-sidebar-foreground/8! -mt-0.5 relative z-50 ml-0.5" />
             </div>
           </div>
@@ -112,7 +83,7 @@ export function LeftSidebar() {
               xmlns="http://www.w3.org/2000/svg"
               className="text-sidebar-foreground h-4 w-auto shrink-0"
               role="img"
-              aria-label="Radium Chat"
+              aria-label="Atomic Chat"
             >
               <path
                 d="M78.862 50.0268L27.8032 171.947C26.7001 174.987 24.9666 177.387 22.6028 179.147C20.3965 180.747 17.9539 181.547 15.2749 181.547C11.02 181.547 7.86822 180.347 5.81956 177.947C3.77091 175.547 2.74658 172.587 2.74658 169.067C2.74658 167.627 2.98297 166.107 3.45573 164.507L62.3151 20.9868C63.5759 17.7868 65.4669 15.3068 67.9883 13.5468C70.6673 11.7868 73.5039 11.0668 76.4981 11.3868C79.3347 11.3868 81.9349 12.2668 84.2988 14.0268C86.8202 15.6268 88.6325 17.9468 89.7356 20.9868L147.886 161.627C148.674 163.707 149.068 165.627 149.068 167.387C149.068 171.707 147.649 175.147 144.813 177.707C142.134 180.267 139.14 181.547 135.83 181.547C132.994 181.547 130.393 180.667 128.03 178.907C125.823 177.147 124.09 174.747 122.829 171.707L72.0068 51.4668L78.862 50.0268ZM35.1311 142.667L48.1321 115.067H111.956L116.447 142.667H35.1311Z"
@@ -183,28 +154,11 @@ export function LeftSidebar() {
               />
             </svg>
           </div>
-          <div className="mt-[6px] px-1">
-            <ChatAgentModeSwitch
-              isAgentMode={sidebarMode === 'agent'}
-              onChange={(isAgent) => selectMode(isAgent ? 'agent' : 'chat')}
-              activeWorkspace={
-                pathname === route.media ? 'media' : undefined
-              }
-              onWorkspaceChange={() =>
-                navigate({ to: route.media })
-              }
-              chatLabel={t('chat:agentMode.chat')}
-              agentLabel={t('chat:agentMode.agent')}
-              agentDisabled={!isAgentProviderSelected}
-              agentDisabledTooltip={t('chat:agentMode.providerUnavailable')}
-              showAgentAttention={showAgentAttention}
-            />
-          </div>
         </SidebarHeader>
         <SidebarContent className="mask-b-from-95% mask-t-from-98%">
-          <NavMain mode={sidebarMode} />
-          {sidebarMode === 'chat' && <NavProjects />}
-          <NavChats mode={sidebarMode} />
+          <NavMain />
+          <NavProjects />
+          <NavChats />
         </SidebarContent>
         <SidebarFooter>
           <SidebarMenu>

@@ -1,7 +1,11 @@
 {
+  "api": "API",
+  "cloud": "Cloud",
   "assistants": "Assistants",
   "hardware": "Matériel",
   "mcp-servers": "Serveurs MCP",
+  "connectors": "Connecteurs",
+  "plugins": "Plugins",
   "local_api_server": "Serveur Local API",
   "https_proxy": "Mandataire Proxy HTTPS",
   "extensions": "Extensions",
@@ -28,6 +32,8 @@
   "unstar": "Désélectionner",
   "deleteAll": "Tout supprimer",
   "star": "Étoile",
+  "openInNewWindow": "Ouvrir dans une nouvelle fenêtre",
+  "openInNewWindowFailed": "Impossible d'ouvrir cette discussion dans une nouvelle fenêtre",
   "rename": "Renommer",
   "delete": "Supprimer",
   "copied": "Copié!",
@@ -382,5 +388,11 @@
   "attachmentInjectedIndicator": "Injecté dans la discussion",
   "attachmentEmbeddedIndicator": "Intégré pour RAG",
   "viewInjectedContent": "Voir le contenu injecté",
-  "injectedContentTitle": "Contenu du fichier injecté"
+  "injectedContentTitle": "Contenu du fichier injecté",
+  "skills": "Compétences",
+  "pluginsMenu": {
+    "title": "Plugins",
+    "emptySkills": "Aucune compétence pour l’instant",
+    "manageSkills": "Gérer les compétences"
+  }
 }

@@ -1,7 +1,11 @@
 {
+  "api": "API",
+  "cloud": "Cloud",
   "assistants": "Asistentes",
   "hardware": "Hardware",
   "mcp-servers": "Servidores MCP",
+  "connectors": "Conectores",
+  "plugins": "Plugins",
   "local_api_server": "Servidor API local",
   "remote_access": "Acceso remoto",
   "integrations": "Integraciones",
@@ -36,6 +40,8 @@
   "unstar": "Quitar estrella",
   "deleteAll": "Eliminar todo",
   "star": "Destacar",
+  "openInNewWindow": "Abrir en una ventana nueva",
+  "openInNewWindowFailed": "No se pudo abrir este chat en una ventana nueva",
   "rename": "Renombrar",
   "delete": "Eliminar",
   "copied": "¡Copiado!",
@@ -446,9 +452,17 @@
   },
   "errors": {
     "fileTooLarge": "Archivo demasiado grande",
-    "fileTooLargeDescription": "{{fileName}} excede el límite de {{maxFileSizeMB}}MB"
+    "fileTooLargeDescription": "{{fileName}} excede el límite de {{maxFileSizeMB}}MB",
+    "fileReadFailed": "No se pudo leer el archivo",
+    "fileReadFailedDescription": "No se pudo leer {{fileName}} desde el disco"
   },
   "files": {
     "chunksCount": "{{count}} fragmentos"
+  },
+  "skills": "Habilidades",
+  "pluginsMenu": {
+    "title": "Plugins",
+    "emptySkills": "Aún no hay habilidades",
+    "manageSkills": "Gestionar habilidades"
   }
 }

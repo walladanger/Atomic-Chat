@@ -17,6 +17,7 @@ import type {
 import { DEFAULT_MODEL_QUANTIZATIONS } from '@/constants/models'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { FamilyLogoMark } from '@/containers/ModelLogo'
 import { cn, sanitizeModelId, LOCAL_LLAMACPP_PROVIDER } from '@/lib/utils'
 import {
   extractModelName,
@@ -31,16 +32,20 @@ import {
   selectCloudGalleryProviders,
   type CloudProviderSaveResult,
 } from '@/containers/dialogs/AddCloudProviderDialog'
-import { findPinnedQuant } from '@/lib/model-card'
+import { findPinnedQuant, parseFileSizeToBytes } from '@/lib/model-card'
+import { isProviderConnected } from '@/lib/cloud-providers'
+import { PlatformFeatures } from '@/lib/platform/const'
+import { PlatformFeature } from '@/lib/platform/types'
+import { judgeMemoryFit, type HardwareProfile } from '@/lib/hardware-tier'
 import { useRecommendedModelsRegistryStore } from '@/stores/recommended-models-registry-store'
 import { useGeneralSetting } from '@/hooks/useGeneralSetting'
 import { useModelLoad } from '@/hooks/useModelLoad'
-import { useOnboardingModelReminderStore } from '@/hooks/useOnboardingModelReminder'
 import { switchToModel } from '@/utils/switchModel'
 import { markSilentImport } from '@/utils/backgroundImports'
 import HeaderPage from './HeaderPage'
 import SetupBackendStep from './SetupBackendStep'
-import { ModelSourceBadge } from '@/components/ModelSourceBadge'
+import { ModelSourceBadge, modelSourceLabel } from '@/components/ModelSourceBadge'
+import { pickSmallestRunnable } from '@/lib/scanned-model-import'
 import {
   scanLocalModels,
   collectImportedModelPaths,
@@ -49,22 +54,30 @@ import {
 import { useModelSources } from '@/hooks/useModelSources'
 import { useShallow } from 'zustand/shallow'
 import { HuggingFaceAuthorAvatar } from '@/components/HuggingFaceAuthorAvatar'
-import { RecommendedModelChip } from '@/components/RecommendedModelChip'
-import { chipVariantForRecommendedDescriptionKey } from '@/constants/recommendedModelChip'
 import { modelFamilyLogoSrc } from '@/lib/model-logo'
-import posthog from 'posthog-js'
-import { getAnalyticsPlatform } from '@/lib/telemetry'
+import { prettyModelName } from '@/lib/model-display-name'
 import {
+  buildRecommendedImpressions,
   captureOnboardingCompleted,
+  captureRecommendedModelClicked,
+  captureRecommendedModelsShown,
+  captureSetupLocalModelAutostarted,
   captureSetupLocalModelRun,
   captureSetupScreenShown,
+  captureSetupSkipped,
+  markOnboardingInFlight,
+  type OnboardingStep,
 } from '@/lib/onboarding-telemetry'
+import { describeProviderState } from '@/lib/onboarding'
+import { extractModelErrorMessage } from '@/lib/modelErrorMessage'
+//* Формат прогресса общий с панелью закачек (ATO-462), чтобы не разъезжался
+import { formatProgressPair } from '@/lib/downloadFormat'
 
 //* Вариант загрузки: пин из манифеста, иначе приоритет квантов как в Hub.
 //! Пин обязателен для LFM2.5-VL-450M (нужен Q8_0): репозиторий отдаёт и Q4_K_M,
 //! который матчится DEFAULT_MODEL_QUANTIZATIONS — без пина скачается рабочий,
 //! но не тот файл, и ошибка не всплывёт нигде.
-function pickPreferredVariant(
+export function pickPreferredVariant(
   model: CatalogModel,
   quantPin?: string
 ): ModelQuant | null {
@@ -83,20 +96,18 @@ function pickPreferredVariant(
 //! getPreferredMmprojModel ищет буквальный id 'mmproj-f16'. У LiquidAI id —
 //! 'mmproj-LFM2_5-VL-450m-F16', совпадения нет, и он падает на mmproj_models[0]
 //! = BF16 (181 MB) вместо Q8_0 (98 MB).
-function pickMmprojModel(
+export function pickMmprojModel(
   model: CatalogModel,
   quantPin?: string
 ): MMProjModel | undefined {
-  return findPinnedQuant(model.mmproj_models, quantPin) ?? getPreferredMmprojModel(model)
-}
-
-//* ГБ для строки прогресса (как в DownloadManagement)
-function formatDownloadGb(bytes: number): string {
-  return (bytes / 1024 ** 3).toFixed(2)
+  return (
+    findPinnedQuant(model.mmproj_models, quantPin) ??
+    getPreferredMmprojModel(model)
+  )
 }
 
 //* Размер найденной на диске модели (байты → "4.50 GB" / "850 MB")
-function formatDetectedSize(bytes?: number): string | null {
+export function formatDetectedSize(bytes?: number): string | null {
   if (!bytes || bytes <= 0) return null
   const gb = bytes / 1024 ** 3
   if (gb >= 1) return `${gb.toFixed(2)} GB`
@@ -104,7 +115,7 @@ function formatDetectedSize(bytes?: number): string | null {
 }
 
 //* Числовой размер в ГБ из строки каталога ("4.5 GB" / "850 MB") для аналитики.
-function sizeStringToGb(size?: string): number | undefined {
+export function sizeStringToGb(size?: string): number | undefined {
   if (!size) return undefined
 
   const match = size.trim().match(/^([\d.]+)\s*(MB|GB)$/i)
@@ -121,24 +132,10 @@ function sizeStringToGb(size?: string): number | undefined {
 const recommendedSetupModelIconSrc = modelFamilyLogoSrc
 
 // Auto-start picks the smallest runnable candidate: it loads fastest, so the
-// first launch feels instant. Candidates without a known size sort last, so a
-// measured model always wins over an unmeasured one.
-function pickAutoRunCandidate(
-  cands: LocalModelCandidate[]
-): LocalModelCandidate | null {
-  let best: LocalModelCandidate | null = null
-  for (const cand of cands) {
-    if (!cand.runnable) continue
-    if (!best) {
-      best = cand
-      continue
-    }
-    const size = cand.sizeBytes ?? Number.POSITIVE_INFINITY
-    const bestSize = best.sizeBytes ?? Number.POSITIVE_INFINITY
-    if (size < bestSize) best = cand
-  }
-  return best
-}
+// first launch feels instant. The rule is shared with the composer widget's
+// "add a folder" route, so a folder added there starts the same model this
+// screen would have.
+export const pickAutoRunCandidate = pickSmallestRunnable
 
 type SetupScreenProps = {
   onSkipped?: () => void
@@ -153,21 +150,92 @@ type SetupScreenProps = {
 ///     the local scanner — LM Studio / HF cache / Unsloth / Ollama) are listed
 ///     at the top with a "Run" button (one-click import, no re-download); the
 ///     recommended catalog models follow below with a "Download" button.
-type OnboardingStep = 'backend' | 'model'
 
-/// Onboarding must never trap the user behind a multi-gigabyte decision: if the
-/// model step is left untouched for this long we enter the chat anyway and hand
-/// the recommendation over to the bottom-right reminder.
-const MODEL_STEP_AUTO_EXIT_MS = 15_000
+/// The subscription this screen offers by name, beside the API-key gallery.
+/// Signing in is not "a cloud provider whose key happens to be a login" — it is
+/// the shortest exit from onboarding there is, so it gets its own button.
+const SUBSCRIPTION_PROVIDER = 'chatgpt'
+
+/// A download click used to swap the screen out instantly, which read as "did
+/// my click register?" — the row flipping to a progress readout was gone before
+/// it could be seen. The picker now holds for this long so the started download
+/// is visible, then hands over to the chat where the sidebar continues it.
+const DOWNLOAD_ENTER_DELAY_MS = 3_000
 
 /// Neither the on-disk scan nor the hardware enumeration may hold the picker
 /// hostage. Both are raced against this deadline; whatever has not answered by
-/// then is treated as "nothing found" / "assume a standard machine".
+/// then is treated as "nothing found" / `FALLBACK_HARDWARE_TIER`.
 const PICKER_INPUT_DEADLINE_MS = 4_000
 
-function getInitialStep(): OnboardingStep {
+/// Whole-GB rendering of a MiB figure, for the "why this one" line. Rounded to
+/// what the user would call their machine ("16 GB"), not to a decimal place
+/// nobody reads off a spec sheet.
+export function formatMemoryGb(mib?: number): string | null {
+  if (!mib || mib <= 0) return null
+  return `${Math.round(mib / 1024)} GB`
+}
+
+/**
+ * The one line under the recommendation that says why it is this model.
+ *
+ * Returns the i18n key and its interpolation values rather than a string, so
+ * the component stays a single `t()` call and the wording lives in the locale
+ * files with the rest.
+ *
+ * The tiers deliberately say different things: a machine with no accelerator is
+ * not memory-bound at all — it is bound by CPU throughput, and telling its owner
+ * "fits your 64 GB" would explain the wrong constraint. Everything else is
+ * judged by {@link judgeMemoryFit}, whose macOS ceiling is a hard one.
+ */
+export type RecommendationFitCopy = {
+  key: string
+  values: Record<string, string>
+  /**
+   * Name of the memory pool, as its own key so the caller resolves it before
+   * interpolating. "16 GB" on a Mac and "16 GB" on a graphics card are not the
+   * same 16 GB, and a line that omits which one reads as a claim about RAM.
+   */
+  poolKey?: string
+}
+
+export function describeRecommendationFit(args: {
+  sizeLabel?: string | null
+  sizeBytes?: number
+  profile: HardwareProfile | null
+}): RecommendationFitCopy | null {
+  const { sizeLabel, sizeBytes, profile } = args
+  if (!sizeLabel) return null
+  const values: Record<string, string> = { size: sizeLabel }
+
+  if (profile?.memoryKind === 'system') {
+    return { key: 'setup:recommend.whyCpuOnly', values }
+  }
+
+  const budget = formatMemoryGb(profile?.budgetMib)
+  const fit = judgeMemoryFit(sizeBytes, profile)
+  if (!budget || !fit || !profile) {
+    return { key: 'setup:recommend.whyUnknown', values }
+  }
+
+  const key = {
+    comfortable: 'setup:recommend.whyComfortable',
+    tight: 'setup:recommend.whyTight',
+    spills: 'setup:recommend.whySpills',
+    wont_load: 'setup:recommend.whyWontLoad',
+  }[fit]
+  return {
+    key,
+    values: { ...values, budget },
+    poolKey: `setup:recommend.pool.${profile.memoryKind}`,
+  }
+}
+
+export function getInitialStep(): OnboardingStep {
   if (typeof window === 'undefined') return 'model'
-  if (!IS_WINDOWS) return 'model'
+  // Windows and Linux both install on a CPU build and both have a GPU build
+  // to offer; the step used to be Windows-only, so a Linux host met its
+  // Vulkan build only if the silent startup upgrade happened to fire.
+  if (!IS_WINDOWS && !IS_LINUX) return 'model'
   // Already completed the dedicated step in a previous session.
   if (localStorage.getItem(localStorageKey.llamacppOnboardingDone)) {
     return 'model'
@@ -182,6 +250,10 @@ function SetupScreen({ onSkipped }: SetupScreenProps) {
     useModelProvider()
 
   const [step, setStep] = useState<OnboardingStep>(getInitialStep)
+  // Read at exit rather than derived from `step`, so an exit that races a step
+  // transition still reports the screen the user was actually on.
+  const stepReachedRef = useRef<OnboardingStep>(step)
+  stepReachedRef.current = step
 
   const handleBackendStepDone = useCallback(
     (status: 'downloaded' | 'skipped') => {
@@ -251,17 +323,24 @@ function SetupScreen({ onSkipped }: SetupScreenProps) {
   >(null)
   const [importingLocalId, setImportingLocalId] = useState<string | null>(null)
 
-  // The tier decides which two models the picker advertises, so rendering
-  // before it is known would swap the whole list under the user. Hardware
+  // The tier decides which single model the screen leads with, so rendering
+  // before it is known would swap the offer under the user. Hardware
   // enumeration starts at app boot and is normally done well before onboarding
   // paints, so this deadline is a backstop, not a routine wait.
-  // Open state is mirrored into a ref because the auto-exit timeout callback
-  // below closes over its own render's value.
   const [cloudDialogOpen, setCloudDialogOpen] = useState(false)
-  const cloudDialogOpenRef = useRef(false)
-  const setCloudDialog = useCallback((open: boolean) => {
-    cloudDialogOpenRef.current = open
-    setCloudDialogOpen(open)
+  // Which entry point opened the dialog: the gallery of API keys, or the named
+  // subscription button, which has to land on the sign-in rather than send the
+  // user back to a gallery to find it again.
+  const [cloudEntry, setCloudEntry] = useState<'gallery' | 'subscription'>(
+    'gallery'
+  )
+  const openCloudGallery = useCallback(() => {
+    setCloudEntry('gallery')
+    setCloudDialogOpen(true)
+  }, [])
+  const openSubscription = useCallback(() => {
+    setCloudEntry('subscription')
+    setCloudDialogOpen(true)
   }, [])
 
   const [tierDeadlineElapsed, setTierDeadlineElapsed] = useState(false)
@@ -280,6 +359,19 @@ function SetupScreen({ onSkipped }: SetupScreenProps) {
     'idle' | 'running' | 'failed'
   >('idle')
   const autoRunFiredRef = useRef(false)
+
+  // Set while the picker holds on screen showing a just-started download (see
+  // DOWNLOAD_ENTER_DELAY_MS). The timer is kept so unmounting can cancel it.
+  const [downloadStartedId, setDownloadStartedId] = useState<string | null>(
+    null
+  )
+  const enterChatTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(
+    () => () => {
+      if (enterChatTimerRef.current) clearTimeout(enterChatTimerRef.current)
+    },
+    []
+  )
 
   useEffect(() => {
     fetchSources()
@@ -311,29 +403,12 @@ function SetupScreen({ onSkipped }: SetupScreenProps) {
       useModelProvider.getState().providers
     )
 
-    // TEMP debug: see exactly what the onboarding scan returns + dedup inputs.
-    console.debug('[SetupScreen] local scan start', {
-      enabled,
-      localScanFolders,
-      importedPaths,
-    })
-
     void scanLocalModels({
       enabled,
       extraRoots: localScanFolders,
       importedPaths,
     })
       .then((found) => {
-        console.debug('[SetupScreen] local scan result', {
-          total: found.length,
-          runnable: found.filter((c) => c.runnable).length,
-          candidates: found.map((c) => ({
-            id: c.id,
-            source: c.source,
-            runnable: c.runnable,
-            path: c.path,
-          })),
-        })
         if (!cancelled) setLocalCandidates(found)
       })
       .catch((err) => {
@@ -346,8 +421,16 @@ function SetupScreen({ onSkipped }: SetupScreenProps) {
     }
   }, [])
 
-  const { tier: hardwareTier, ready: hardwareTierReady } = useHardwareTier()
-  const recommendedItems = useResolvedRecommendedModels(sources, hardwareTier)
+  const {
+    tier: hardwareTier,
+    profile: hardwareProfile,
+    ready: hardwareTierReady,
+  } = useHardwareTier()
+  const recommendedItems = useResolvedRecommendedModels(
+    sources,
+    hardwareTier,
+    hardwareProfile
+  )
 
   // Every input the picker needs before it can paint a stable list.
   const pickerInputsPending =
@@ -361,63 +444,19 @@ function SetupScreen({ onSkipped }: SetupScreenProps) {
     [localCandidates]
   )
 
+  const autoRunTargetRef = useRef<LocalModelCandidate | null>(null)
   const autoRunTarget = useMemo(
     () => pickAutoRunCandidate(detectedRunnable),
     [detectedRunnable]
   )
+  autoRunTargetRef.current = autoRunTarget
 
-  //* P0 онбординг-аналитика: фиксируем показ экрана выбора модели один раз,
-  //* дождавшись резолва списка рекомендаций (иначе recommended_count = 0).
-  const setupShownFiredRef = useRef(false)
+  // A window close gives the renderer nothing to hang an exit event on, so the
+  // run is recorded here and reported as abandoned at the next launch if it is
+  // still there. Re-runs on step change so `step_reached` is the real one.
   useEffect(() => {
-    if (step !== 'model' || setupShownFiredRef.current) return
-    if (pickerInputsPending) return
-    // A pending auto-start means the picker is never rendered. It used to
-    // suppress the event entirely, which dropped those sessions out of the
-    // funnel; now it is reported with `rendered: false`.
-    const rendered = !(autoRunTarget && autoRunState !== 'failed')
-    if (rendered && recommendedItems.length === 0 && sourcesLoading) return
-    setupShownFiredRef.current = true
-    captureSetupScreenShown({
-      recommendedCount: recommendedItems.length,
-      rendered,
-      hardwareTier,
-      hardwareTierResolved: hardwareTierReady,
-    })
-  }, [
-    step,
-    pickerInputsPending,
-    autoRunTarget,
-    autoRunState,
-    recommendedItems.length,
-    sourcesLoading,
-    hardwareTier,
-    hardwareTierReady,
-  ])
-
-  //* P0: клик «Download» на рекомендованной карточке (до старта загрузки).
-  const captureRecommendedClick = useCallback(
-    (params: {
-      modelId: string
-      format: 'GGUF' | 'MLX'
-      sizeGb?: number
-      position: number
-    }) => {
-      try {
-        posthog.capture('recommended_model_clicked', {
-          model_id: params.modelId,
-          size_gb: params.sizeGb ?? null,
-          format: params.format,
-          position: params.position,
-          platform: getAnalyticsPlatform(),
-          app_version: VERSION,
-        })
-      } catch (err) {
-        console.debug('recommended_model_clicked telemetry failed:', err)
-      }
-    },
-    []
-  )
+    markOnboardingInFlight(step, onboardingStartedAtRef.current)
+  }, [step])
 
   const downloadProcesses = useMemo(
     () =>
@@ -479,7 +518,9 @@ function SetupScreen({ onSkipped }: SetupScreenProps) {
       provider: LocalLlamacppProvider | 'mlx'
       sizeLabel: string | null | undefined
     }> = []
-    const pending: typeof recommendedItems = []
+    const pending: Array<
+      (typeof recommendedItems)[number] & { startId?: string }
+    > = []
 
     for (const item of recommendedItems) {
       const { model } = item
@@ -488,7 +529,9 @@ function SetupScreen({ onSkipped }: SetupScreenProps) {
         continue
       }
       const isMlx = !!model.is_mlx
-      const variant = !isMlx ? pickPreferredVariant(model, item.rec.quant) : null
+      const variant = !isMlx
+        ? pickPreferredVariant(model, item.rec.quant)
+        : null
       const downloaded = isMlx
         ? isMlxDownloaded(model)
         : variant
@@ -512,12 +555,81 @@ function SetupScreen({ onSkipped }: SetupScreenProps) {
               ),
         })
       } else {
-        pending.push(item)
+        // The id a click on this row would attribute to, resolved here so the
+        // impression event can name the same model the click will.
+        pending.push({
+          ...item,
+          startId: isMlx ? getMlxModelId(model) : variant?.model_id,
+        })
       }
     }
 
     return { installedRecommended: installed, pendingRecommended: pending }
   }, [recommendedItems, isMlxDownloaded, isVariantDownloaded, getMlxModelId])
+
+  // The screen leads with ONE model. `useResolvedRecommendedModels` returns the
+  // ladder rung for this machine first, so the hero is simply the first entry
+  // the user does not already have — anything already on disk has moved up into
+  // "On your device" with a Run button, which is a better offer than a
+  // re-download. The rest of the ladder is what the Hub is for.
+  //
+  // Why one and not the previous list of two-to-eleven: the manifest served two
+  // per tier plus whatever the scanners found, and historical launches shipped
+  // 6, 10 and 11 rows. A first screen whose job is "start chatting" should not
+  // open with a comparison table.
+  const heroRecommendation = pendingRecommended[0] ?? null
+
+  //* P0 онбординг-аналитика: фиксируем показ экрана выбора модели один раз,
+  //* дождавшись резолва списка рекомендаций (иначе recommended_count = 0).
+  const setupShownFiredRef = useRef(false)
+  useEffect(() => {
+    if (step !== 'model' || setupShownFiredRef.current) return
+    if (pickerInputsPending) return
+    // A pending auto-start means the picker is never rendered. It used to
+    // suppress the event entirely, which dropped those sessions out of the
+    // funnel; now it is reported with `rendered: false`.
+    const rendered = !(autoRunTarget && autoRunState !== 'failed')
+    if (rendered && recommendedItems.length === 0 && sourcesLoading) return
+    setupShownFiredRef.current = true
+    captureSetupScreenShown({
+      recommendedCount: recommendedItems.length,
+      rendered,
+      hardwareTier,
+      hardwareTierResolved: hardwareTierReady,
+      memoryKind: hardwareProfile?.memoryKind ?? null,
+      memoryBudgetMib: hardwareProfile?.budgetMib ?? null,
+      primaryModelId: heroRecommendation?.startId ?? null,
+      // Reported on every session, found or not: `detected_count` on the
+      // autostart event only ever counted the installs where the scan hit.
+      detectedLocalModelsCount: detectedRunnable.length,
+      detectedSources: [...new Set(detectedRunnable.map((c) => c.source))],
+    })
+    // Clicks have always carried a `position`; impressions never did, so a
+    // row's conversion — and whether the list is read past the first entry —
+    // could not be computed at all.
+    captureRecommendedModelsShown(
+      buildRecommendedImpressions({
+        // Only the offer: it is the sole row the screen paints, so a row
+        // nobody saw never gets a denominator.
+        pending: heroRecommendation ? [heroRecommendation] : [],
+        installed: installedRecommended,
+        detected: detectedRunnable,
+      })
+    )
+  }, [
+    step,
+    pickerInputsPending,
+    autoRunTarget,
+    autoRunState,
+    recommendedItems.length,
+    sourcesLoading,
+    hardwareTier,
+    hardwareTierReady,
+    hardwareProfile,
+    heroRecommendation,
+    installedRecommended,
+    detectedRunnable,
+  ])
 
   const startDownload = useCallback(
     (catalog: CatalogModel, variant: ModelQuant, mmprojPath?: string) => {
@@ -596,7 +708,7 @@ function SetupScreen({ onSkipped }: SetupScreenProps) {
         markResumableDownload(mlxId)
         removeLocalDownloadingModel(mlxId)
         toast.error('Failed to download MLX model', {
-          description: error instanceof Error ? error.message : 'Unknown error',
+          description: extractModelErrorMessage(error),
         })
       }
     },
@@ -622,7 +734,10 @@ function SetupScreen({ onSkipped }: SetupScreenProps) {
       captureOnboardingCompleted({
         exitPath: 'imported',
         hadAnyModel: true,
-        stepReached: 'model',
+        providerState: describeProviderState(
+          useModelProvider.getState().providers
+        ),
+        stepReached: stepReachedRef.current,
         startedAtMs: onboardingStartedAtRef.current,
       })
       trackedImportIdsRef.current.delete(importedId)
@@ -640,6 +755,19 @@ function SetupScreen({ onSkipped }: SetupScreenProps) {
       )
       const modelId = found ? found.id : catalogId
       selectModelProvider(providerName, modelId)
+
+      // A model another app left on disk was picked up and started without a
+      // screen of its own. Say so once, in the chat the user is about to see,
+      // rather than adding a wizard step for it.
+      const autoRun = autoRunTargetRef.current
+      if (autoRun && autoRun.id === importedId) {
+        const source = modelSourceLabel(autoRun.source)
+        toast.success(
+          source
+            ? t('setup:foundFrom', { name: autoRun.displayName, source })
+            : t('setup:foundLocal', { name: autoRun.displayName })
+        )
+      }
 
       toast.dismiss(`model-validation-started-${catalogId}`)
       localStorage.setItem(localStorageKey.setupCompleted, 'true')
@@ -713,7 +841,10 @@ function SetupScreen({ onSkipped }: SetupScreenProps) {
       captureOnboardingCompleted({
         exitPath: 'download_started',
         hadAnyModel: true,
-        stepReached: 'model',
+        providerState: describeProviderState(
+          useModelProvider.getState().providers
+        ),
+        stepReached: stepReachedRef.current,
         startedAtMs: onboardingStartedAtRef.current,
       })
       localStorage.setItem(localStorageKey.setupCompleted, 'true')
@@ -734,6 +865,22 @@ function SetupScreen({ onSkipped }: SetupScreenProps) {
       })
     },
     [navigate]
+  )
+
+  // Download path: unlike "Run", which switches to a model that is ready, this
+  // one leaves the user waiting on bytes — so the row is held on screen long
+  // enough to show that the download actually started before the chat (and its
+  // sidebar progress) takes over.
+  const enterChatAfterDownloadStart = useCallback(
+    (modelId: string, providerName: LocalLlamacppProvider | 'mlx') => {
+      if (hasNavigatedRef.current || enterChatTimerRef.current) return
+      setDownloadStartedId(modelId)
+      enterChatTimerRef.current = setTimeout(() => {
+        enterChatTimerRef.current = null
+        enterChatForDownload(modelId, providerName)
+      }, DOWNLOAD_ENTER_DELAY_MS)
+    },
+    [enterChatForDownload]
   )
 
   // Provider that runs a given candidate (MLX vs the upstream llama.cpp engine).
@@ -822,7 +969,7 @@ function SetupScreen({ onSkipped }: SetupScreenProps) {
         pendingBackgroundImportsRef.current = []
         if (rest.length) importCandidatesInBackground(rest)
         toast.error(t('setup:localStep.importFailed'), {
-          description: error instanceof Error ? error.message : 'Unknown error',
+          description: extractModelErrorMessage(error),
         })
         return false
       }
@@ -845,20 +992,12 @@ function SetupScreen({ onSkipped }: SetupScreenProps) {
 
     autoRunFiredRef.current = true
     setAutoRunState('running')
-    try {
-      posthog.capture('setup_local_model_autostarted', {
-        source: autoRunTarget.source,
-        format: autoRunTarget.format,
-        size_gb: autoRunTarget.sizeBytes
-          ? Math.round((autoRunTarget.sizeBytes / 1024 ** 3) * 100) / 100
-          : null,
-        detected_count: detectedRunnable.length,
-        platform: getAnalyticsPlatform(),
-        app_version: VERSION,
-      })
-    } catch (err) {
-      console.debug('setup_local_model_autostarted telemetry failed:', err)
-    }
+    captureSetupLocalModelAutostarted({
+      scanSource: autoRunTarget.source,
+      format: autoRunTarget.format,
+      sizeBytes: autoRunTarget.sizeBytes,
+      detectedCount: detectedRunnable.length,
+    })
 
     void onRunLocalModel(autoRunTarget).then((started) => {
       if (!started) setAutoRunState('failed')
@@ -883,7 +1022,13 @@ function SetupScreen({ onSkipped }: SetupScreenProps) {
       captureOnboardingCompleted({
         exitPath: 'cloud_provider',
         hadAnyModel: true,
-        stepReached: 'model',
+        providerState: describeProviderState(
+          useModelProvider.getState().providers
+        ),
+        // Without this a ChatGPT subscription and a pasted API key are the
+        // same exit.
+        exitProvider: providerName,
+        stepReached: stepReachedRef.current,
         startedAtMs: onboardingStartedAtRef.current,
       })
 
@@ -911,7 +1056,9 @@ function SetupScreen({ onSkipped }: SetupScreenProps) {
       if (modelId) {
         // Registers the remote provider and starts the local proxy.
         // Fire-and-forget so navigation is not blocked on it.
-        void switchToModel({ modelId, providerName, serviceHub }).catch(() => {})
+        void switchToModel({ modelId, providerName, serviceHub }).catch(
+          () => {}
+        )
       }
 
       void navigate({
@@ -938,42 +1085,60 @@ function SetupScreen({ onSkipped }: SetupScreenProps) {
     [providers]
   )
 
-  // Leaving onboarding empty-handed. Since the Skip link was removed this is
-  // reachable only through the auto-exit timeout — the `reason` is kept on the
-  // event so the existing `setup_skipped` funnel stays comparable across the
-  // change. Picking a model takes a different route (handleImportedId /
-  // enterChatForDownload) and must not arm the bottom-right reminder.
+  // The ChatGPT subscription, promoted out of the key gallery into a button of
+  // its own. It is not a key you paste, it is a sign-in — and connecting *any*
+  // cloud provider during onboarding is close to a guaranteed activation (144
+  // of 153 who did it activated; day-2 return 58.3 % against 36.7 %), while
+  // `provider_key_configured.during_onboarding = true` has fired for seven
+  // devices in the product's history. That gap is the whole reason these two
+  // buttons now sit beside the model rather than under an "or".
+  //
+  // Kept as the provider object, not a boolean: the button wears the
+  // subscription's own mark so the named route is recognisable at a glance.
+  const subscriptionProvider = useMemo(() => {
+    if (!PlatformFeatures[PlatformFeature.CHATGPT_SUBSCRIPTION])
+      return undefined
+    const provider = providers.find((p) => p.provider === SUBSCRIPTION_PROVIDER)
+    return provider && !isProviderConnected(provider) ? provider : undefined
+  }, [providers])
+
+  // Leaving onboarding empty-handed, by pressing Skip.
+  //
+  // This used to be a 15-second timer with no visible control: 60 % of all
+  // onboarding exits took it, at a 16.2 s median — people were sitting through
+  // it, not being rescued by it. The reason it had no button was that leaving
+  // without a model was a dead end; ATO-453's composer widget removed the dead
+  // end, so the honest control can exist.
+  //
+  // The bottom-right reminder is deliberately NOT armed here: the composer's
+  // widget already recommends the same model at the moment of the blocked
+  // send, and two surfaces offering one download is nagging, not help.
   const leaveWithoutModel = useCallback(
-    (reason: 'timeout') => {
+    (reason: 'dismissed') => {
       if (hasNavigatedRef.current) return
       hasNavigatedRef.current = true
 
       // Still import every detected model (no launch) before leaving onboarding.
       importCandidatesInBackground(localCandidates ?? [])
-      try {
-        const hadAnyModel = providers.some(
-          (p) => (p.models?.length ?? 0) > 0 || !!p.api_key
-        )
-        posthog.capture('setup_skipped', {
-          had_any_model: hadAnyModel,
-          reason,
-          platform: getAnalyticsPlatform(),
-          app_version: VERSION,
-        })
-        captureOnboardingCompleted({
-          exitPath: reason,
-          hadAnyModel,
-          stepReached: 'model',
-          startedAtMs: onboardingStartedAtRef.current,
-        })
-      } catch (err) {
-        console.debug('setup_skipped telemetry failed:', err)
-      }
+      // Legacy predicate, kept verbatim so `had_any_model` stays comparable
+      // with its own history. It means "the picker had something to show" —
+      // `providerState` below is what actually answers "did they leave with a
+      // model", and the two disagreeing is itself worth seeing.
+      const hadAnyModel = providers.some(
+        (p) => (p.models?.length ?? 0) > 0 || !!p.api_key
+      )
+      captureSetupSkipped({ hadAnyModel, reason })
+      captureOnboardingCompleted({
+        exitPath: reason,
+        hadAnyModel,
+        providerState: describeProviderState(providers),
+        stepReached: stepReachedRef.current,
+        startedAtMs: onboardingStartedAtRef.current,
+      })
       localStorage.setItem(localStorageKey.setupCompleted, 'true')
       // Same-tab signal — see useSetupCompleted in routes/__root.tsx.
       window.dispatchEvent(new Event('app:setup-completed'))
       localStorage.removeItem(localStorageKey.lastUsedModel)
-      useOnboardingModelReminderStore.getState().setPending(true)
       onSkipped?.()
 
       // Already open for the model step; kept so the main app is never entered
@@ -994,34 +1159,6 @@ function SetupScreen({ onSkipped }: SetupScreenProps) {
       localCandidates,
     ]
   )
-
-  // Read through a ref so the timeout below is armed once per model step
-  // instead of being restarted every time a background import refreshes the
-  // provider list.
-  const leaveWithoutModelRef = useRef(leaveWithoutModel)
-  useEffect(() => {
-    leaveWithoutModelRef.current = leaveWithoutModel
-  }, [leaveWithoutModel])
-
-  // Armed only once the picker is actually on screen, and disarmed while an
-  // import is in flight so a slow local model can't be cut short.
-  useEffect(() => {
-    // Do not start the 15s exit clock behind the loading screen.
-    if (step !== 'model' || pickerInputsPending) return
-    if (importingLocalId !== null) return
-    // Onboarding must not navigate out from under an open dialog.
-    if (cloudDialogOpen) return
-
-    const timer = setTimeout(() => {
-      // Second layer, deliberately: the dependency above cancels a pending
-      // timer when the dialog opens, but a click at t≈14.99s can fire this
-      // callback before React commits that state update.
-      if (cloudDialogOpenRef.current) return
-      leaveWithoutModelRef.current('timeout')
-    }, MODEL_STEP_AUTO_EXIT_MS)
-
-    return () => clearTimeout(timer)
-  }, [step, pickerInputsPending, importingLocalId, cloudDialogOpen])
 
   // Unlike the previous full-screen onboarding, the model step lives inside the
   // chat area, so the sidebar is already there when the user lands in chat.
@@ -1053,14 +1190,13 @@ function SetupScreen({ onSkipped }: SetupScreenProps) {
   // Two states that replace the picker entirely: the brief scan (so detected
   // models don't pop in and shove the list down) and the auto-start of a model
   // found on disk, which needs feedback rather than a decision.
-  const statusMessage =
-    pickerInputsPending
-      ? t('common:loading')
-      : autoRunState === 'running' && autoRunTarget
-        ? t('setup:localStep.autoStarting', {
-            name: autoRunTarget.displayName,
-          })
-        : null
+  const statusMessage = pickerInputsPending
+    ? t('common:loading')
+    : autoRunState === 'running' && autoRunTarget
+      ? t('setup:localStep.autoStarting', {
+          name: prettyModelName(autoRunTarget.displayName),
+        })
+      : null
 
   if (statusMessage) {
     return (
@@ -1068,6 +1204,261 @@ function SetupScreen({ onSkipped }: SetupScreenProps) {
         <HeaderPage />
         <div className="flex flex-1 items-center justify-center">
           <div className="text-muted-foreground text-sm">{statusMessage}</div>
+        </div>
+      </div>
+    )
+  }
+
+  /**
+   * One downloadable recommendation.
+   *
+   * `hero` changes the emphasis: a card instead of a list row, the "why this
+   * one" line, and a full-width primary button.
+   *
+   * `index` is the row's position in `pendingRecommended`, which is what
+   * `recommended_model_shown` reports, so clicks and impressions divide.
+   */
+  const renderPendingRow = (
+    item: (typeof pendingRecommended)[number],
+    index: number,
+    hero = false
+  ) => {
+    const { rec, model } = item
+    const isMlx = !!model?.is_mlx
+    const variant =
+      model && !isMlx ? pickPreferredVariant(model, rec.quant) : null
+    //* Тот же проектор, что уйдёт в загрузку, — иначе строка покажет размер
+    //* одного файла, а скачается другой.
+    const mmproj =
+      model && !isMlx ? pickMmprojModel(model, rec.mmprojQuant) : undefined
+    //* MLX: суммируем все safetensors-шарды; GGUF: quant + mmproj
+    const downloadSize = isMlx
+      ? getMlxTotalFileSize(model!)
+      : model && variant
+        ? getTotalDownloadFileSize(model, variant, mmproj)
+        : variant?.file_size
+    //* id, по которому опрашиваем downloadStore (GGUF → quant.id, MLX → mlxId)
+    const rowTrackId = isMlx
+      ? model
+        ? getMlxModelId(model)
+        : null
+      : (variant?.model_id ?? null)
+    const rowDownloading = rowTrackId ? isVariantDownloading(rowTrackId) : false
+    const rowDownloaded = isMlx
+      ? model
+        ? isMlxDownloaded(model)
+        : false
+      : model && variant
+        ? isVariantDownloaded(model, variant)
+        : false
+    const hfAuthor =
+      model?.developer?.trim() || rec.modelName.split('/')[0]?.trim() || ''
+    const nameForInitials =
+      extractModelName(rec.modelName) || rec.modelName || '?'
+    const rowInitials =
+      nameForInitials
+        .replace(/\.(gguf|GGUF)$/i, '')
+        .replace(/[^a-zA-Z0-9]/g, '')
+        .slice(0, 2) ||
+      hfAuthor.slice(0, 2) ||
+      '?'
+    const brandIconSrc = recommendedSetupModelIconSrc(rec.modelName)
+    const rowDownloadProgress = rowTrackId
+      ? downloadProcesses.find((p) => p.id === rowTrackId)
+      : undefined
+
+    const onDownload = () => {
+      if (!model) return
+      // Detected-on-disk models still land in the library even when the user
+      // downloads a catalog model instead of running them.
+      importCandidatesInBackground(localCandidates ?? [])
+      if (isMlx) {
+        captureRecommendedModelClicked({
+          modelId: getMlxModelId(model),
+          format: 'MLX',
+          sizeGb: sizeStringToGb(downloadSize),
+          position: index,
+        })
+        void startMlxDownload(model)
+        enterChatAfterDownloadStart(getMlxModelId(model), 'mlx')
+      } else if (variant) {
+        captureRecommendedModelClicked({
+          modelId: variant.model_id,
+          format: 'GGUF',
+          sizeGb: sizeStringToGb(downloadSize),
+          position: index,
+        })
+        startDownload(model, variant, mmproj?.path)
+        enterChatAfterDownloadStart(
+          variant.model_id,
+          LOCAL_LLAMACPP_PROVIDER as LocalLlamacppProvider
+        )
+      }
+    }
+
+    const icon = brandIconSrc ? (
+      <FamilyLogoMark
+        src={brandIconSrc}
+        className={cn('shrink-0', hero ? 'size-10' : 'size-8')}
+      />
+    ) : (
+      <HuggingFaceAuthorAvatar
+        author={hfAuthor}
+        initials={rowInitials}
+        className={cn('shrink-0', hero ? 'size-10' : 'size-8')}
+      />
+    )
+
+    const title = model
+      ? prettyModelName(model.model_name)
+      : prettyModelName(rec.modelName)
+
+    const buttonLabel = rowDownloaded
+      ? t('hub:downloaded')
+      : rowDownloading
+        ? t('setup:downloading')
+        : t('hub:download')
+
+    const progressLine =
+      rowDownloading && rowTrackId ? (
+        <p
+          className={cn(
+            'text-xs text-muted-foreground tabular-nums',
+            hero ? 'text-center' : 'text-right'
+          )}
+          aria-live="polite"
+        >
+          {rowDownloadProgress && rowDownloadProgress.total > 0
+            ? `${Math.round((rowDownloadProgress.progress ?? 0) * 100)}% · ${formatProgressPair(rowDownloadProgress.current, rowDownloadProgress.total)}`
+            : t('setup:downloadPreparing')}
+        </p>
+      ) : null
+
+    // Says where the download is about to go, so the screen change three
+    // seconds later is something the user was told about.
+    const handoffLine =
+      rowTrackId && downloadStartedId === rowTrackId ? (
+        <p
+          className={cn(
+            'text-xs text-muted-foreground',
+            hero ? 'text-center' : 'text-right'
+          )}
+        >
+          {t('setup:downloadStartedOpening')}
+        </p>
+      ) : null
+
+    const disabled =
+      !model || (!isMlx && !variant) || rowDownloading || rowDownloaded
+
+    if (hero) {
+      //* «Почему эта»: размер против бюджета памяти этой машины, а не
+      //* абстрактное «рекомендуем» — см. describeRecommendationFit.
+      const fit = describeRecommendationFit({
+        sizeLabel: downloadSize,
+        sizeBytes: parseFileSizeToBytes(downloadSize ?? undefined),
+        profile: hardwareProfile,
+      })
+
+      return (
+        <div
+          key={`${rec.modelName}-${rec.descriptionKey}`}
+          className="flex w-full shrink-0 flex-col gap-3 rounded-lg border bg-secondary/50 p-4"
+        >
+          <div className="flex min-w-0 items-center gap-3">
+            {icon}
+            <div className="min-w-0 flex-1">
+              <h2 className="truncate text-sm font-medium leading-tight">
+                {title}
+              </h2>
+              <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
+                {fit
+                  ? t(fit.key, {
+                      ...fit.values,
+                      ...(fit.poolKey ? { pool: t(fit.poolKey) } : {}),
+                    })
+                  : !model && sourcesLoading
+                    ? t('hub:loadingModels')
+                    : !model
+                      ? t('setup:modelUnavailable')
+                      : t(rec.descriptionKey)}
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            disabled={disabled}
+            onClick={onDownload}
+            className="w-full rounded-full"
+          >
+            {buttonLabel}
+          </Button>
+          {progressLine}
+          {handoffLine}
+        </div>
+      )
+    }
+
+    return (
+      <div
+        key={`${rec.modelName}-${rec.descriptionKey}`}
+        className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0"
+      >
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          {icon}
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-sm font-medium leading-tight">
+              {title}
+              {downloadSize ? (
+                <span className="text-xs font-normal text-muted-foreground">
+                  {' '}
+                  · {downloadSize}
+                </span>
+              ) : null}
+            </h2>
+            {!model && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {sourcesLoading
+                  ? t('hub:loadingModels')
+                  : t('setup:modelUnavailable')}
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <Button
+            size="sm"
+            disabled={disabled}
+            onClick={onDownload}
+            className="shrink-0 rounded-full px-4"
+          >
+            {/* Reserve width for the widest possible label so the button
+                doesn't reflow when its state flips between Download /
+                Downloading… / Downloaded. */}
+            <span className="grid">
+              <span
+                aria-hidden="true"
+                className="invisible col-start-1 row-start-1"
+              >
+                {t('setup:downloading')}
+              </span>
+              <span
+                aria-hidden="true"
+                className="invisible col-start-1 row-start-1"
+              >
+                {t('hub:downloaded')}
+              </span>
+              <span
+                aria-hidden="true"
+                className="invisible col-start-1 row-start-1"
+              >
+                {t('hub:download')}
+              </span>
+              <span className="col-start-1 row-start-1">{buttonLabel}</span>
+            </span>
+          </Button>
+          {progressLine}
+          {handoffLine}
         </div>
       </div>
     )
@@ -1132,12 +1523,9 @@ function SetupScreen({ onSkipped }: SetupScreenProps) {
                           >
                             <div className="flex min-w-0 flex-1 items-center gap-3">
                               {brandIconSrc ? (
-                                <img
+                                <FamilyLogoMark
                                   src={brandIconSrc}
-                                  alt=""
-                                  className="size-8 shrink-0 object-contain"
-                                  draggable={false}
-                                  aria-hidden
+                                  className="size-8 shrink-0"
                                 />
                               ) : (
                                 <HuggingFaceAuthorAvatar
@@ -1151,7 +1539,7 @@ function SetupScreen({ onSkipped }: SetupScreenProps) {
                                   className="truncate text-sm font-medium leading-tight"
                                   title={cand.path}
                                 >
-                                  {cand.displayName}
+                                  {prettyModelName(cand.displayName)}
                                   {size ? (
                                     <span className="text-xs font-normal text-muted-foreground">
                                       {' '}
@@ -1171,7 +1559,7 @@ function SetupScreen({ onSkipped }: SetupScreenProps) {
                                 onClick={() => {
                                   captureSetupLocalModelRun({
                                     trigger: 'manual',
-                                    source: cand.source,
+                                    scanSource: cand.source,
                                     format: cand.format,
                                     sizeBytes: cand.sizeBytes,
                                     detectedCount: detectedRunnable.length,
@@ -1222,12 +1610,9 @@ function SetupScreen({ onSkipped }: SetupScreenProps) {
                             >
                               <div className="flex min-w-0 flex-1 items-center gap-3">
                                 {brandIconSrc ? (
-                                  <img
+                                  <FamilyLogoMark
                                     src={brandIconSrc}
-                                    alt=""
-                                    className="size-8 shrink-0 object-contain"
-                                    draggable={false}
-                                    aria-hidden
+                                    className="size-8 shrink-0"
                                   />
                                 ) : (
                                   <HuggingFaceAuthorAvatar
@@ -1238,7 +1623,7 @@ function SetupScreen({ onSkipped }: SetupScreenProps) {
                                 )}
                                 <div className="min-w-0 flex-1">
                                   <h2 className="truncate text-sm font-medium leading-tight">
-                                    {extractModelName(model.model_name)}
+                                    {prettyModelName(model.model_name)}
                                     {sizeLabel ? (
                                       <span className="text-xs font-normal text-muted-foreground">
                                         {' '}
@@ -1246,15 +1631,6 @@ function SetupScreen({ onSkipped }: SetupScreenProps) {
                                       </span>
                                     ) : null}
                                   </h2>
-                                  <RecommendedModelChip
-                                    className="mt-1 inline-flex max-w-full"
-                                    variant={chipVariantForRecommendedDescriptionKey(
-                                      rec.descriptionKey
-                                    )}
-                                    title={t(rec.descriptionKey)}
-                                  >
-                                    {t(rec.descriptionKey)}
-                                  </RecommendedModelChip>
                                 </div>
                               </div>
                               <div className="flex shrink-0 flex-col items-end gap-1">
@@ -1264,7 +1640,7 @@ function SetupScreen({ onSkipped }: SetupScreenProps) {
                                   onClick={() => {
                                     captureSetupLocalModelRun({
                                       trigger: 'installed_recommended',
-                                      source: provider,
+                                      providerId: provider,
                                       format: model.is_mlx ? 'mlx' : 'gguf',
                                     })
                                     importCandidatesInBackground(
@@ -1286,252 +1662,65 @@ function SetupScreen({ onSkipped }: SetupScreenProps) {
                 </div>
               )}
 
-              <div className="flex flex-col gap-2">
-                {pendingRecommended.length > 0 && (
+              <div className="flex flex-col gap-3">
+                {/* One offer, not a list. The rung of the ladder this machine
+                    sits on — see `useResolvedRecommendedModels`. */}
+                {heroRecommendation && (
                   <>
                     <span className="shrink-0 text-left text-xs font-medium text-muted-foreground">
-                      {t('hub:recTitle')}
+                      {t('setup:recommend.title')}
                     </span>
-                    <div
-                      className={cn(
-                        'w-full shrink-0 rounded-lg border bg-secondary/50 px-3 py-2',
-                        'max-h-[min(70vh,36rem)] overflow-y-auto overscroll-y-contain [scrollbar-gutter:stable]'
-                      )}
-                    >
-                      <div className="flex flex-col divide-y divide-border/60">
-                        {pendingRecommended.map(({ rec, model }, index) => {
-                          const isMlx = !!model?.is_mlx
-                          const variant =
-                            model && !isMlx
-                              ? pickPreferredVariant(model, rec.quant)
-                              : null
-                          //* Тот же проектор, что уйдёт в загрузку, — иначе
-                          //* строка покажет размер одного файла, а скачается другой.
-                          const mmproj =
-                            model && !isMlx
-                              ? pickMmprojModel(model, rec.mmprojQuant)
-                              : undefined
-                          //* MLX: суммируем все safetensors-шарды; GGUF: quant + mmproj
-                          const downloadSize = isMlx
-                            ? getMlxTotalFileSize(model!)
-                            : model && variant
-                              ? getTotalDownloadFileSize(model, variant, mmproj)
-                              : variant?.file_size
-                          //* id, по которому опрашиваем downloadStore (GGUF → quant.id, MLX → mlxId)
-                          const rowTrackId = isMlx
-                            ? model
-                              ? getMlxModelId(model)
-                              : null
-                            : (variant?.model_id ?? null)
-                          const rowDownloading = rowTrackId
-                            ? isVariantDownloading(rowTrackId)
-                            : false
-                          const rowDownloaded = isMlx
-                            ? model
-                              ? isMlxDownloaded(model)
-                              : false
-                            : model && variant
-                              ? isVariantDownloaded(model, variant)
-                              : false
-                          const hfAuthor =
-                            model?.developer?.trim() ||
-                            rec.modelName.split('/')[0]?.trim() ||
-                            ''
-                          const nameForInitials =
-                            extractModelName(rec.modelName) ||
-                            rec.modelName ||
-                            '?'
-                          const rowInitials =
-                            nameForInitials
-                              .replace(/\.(gguf|GGUF)$/i, '')
-                              .replace(/[^a-zA-Z0-9]/g, '')
-                              .slice(0, 2) ||
-                            hfAuthor.slice(0, 2) ||
-                            '?'
-
-                          const brandIconSrc = recommendedSetupModelIconSrc(
-                            rec.modelName
-                          )
-                          const rowDownloadProgress = rowTrackId
-                            ? downloadProcesses.find((p) => p.id === rowTrackId)
-                            : undefined
-
-                          return (
-                            <div
-                              key={`${rec.modelName}-${rec.descriptionKey}`}
-                              className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0"
-                            >
-                              <div className="flex min-w-0 flex-1 items-center gap-3">
-                                {brandIconSrc ? (
-                                  <img
-                                    src={brandIconSrc}
-                                    alt=""
-                                    className="size-8 shrink-0 object-contain"
-                                    draggable={false}
-                                    aria-hidden
-                                  />
-                                ) : (
-                                  <HuggingFaceAuthorAvatar
-                                    author={hfAuthor}
-                                    initials={rowInitials}
-                                    className="size-8 shrink-0"
-                                  />
-                                )}
-                                <div className="min-w-0 flex-1">
-                                  <h2 className="truncate text-sm font-medium leading-tight">
-                                    {model
-                                      ? extractModelName(model.model_name)
-                                      : extractModelName(rec.modelName)}
-                                    {downloadSize ? (
-                                      <span className="text-xs font-normal text-muted-foreground">
-                                        {' '}
-                                        · {downloadSize}
-                                      </span>
-                                    ) : null}
-                                  </h2>
-                                  <RecommendedModelChip
-                                    className="mt-1 inline-flex max-w-full"
-                                    variant={chipVariantForRecommendedDescriptionKey(
-                                      rec.descriptionKey
-                                    )}
-                                    title={t(rec.descriptionKey)}
-                                  >
-                                    {t(rec.descriptionKey)}
-                                  </RecommendedModelChip>
-                                  {!model && (
-                                    <p className="mt-1 text-xs text-muted-foreground">
-                                      {sourcesLoading
-                                        ? t('hub:loadingModels')
-                                        : t('setup:modelUnavailable')}
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="flex shrink-0 flex-col items-end gap-1">
-                                <Button
-                                  size="sm"
-                                  disabled={
-                                    !model ||
-                                    (!isMlx && !variant) ||
-                                    rowDownloading ||
-                                    rowDownloaded
-                                  }
-                                  onClick={() => {
-                                    if (!model) return
-                                    // Detected-on-disk models still land in the
-                                    // library even when the user downloads a
-                                    // catalog model instead of running them.
-                                    importCandidatesInBackground(
-                                      localCandidates ?? []
-                                    )
-                                    if (isMlx) {
-                                      captureRecommendedClick({
-                                        modelId: getMlxModelId(model),
-                                        format: 'MLX',
-                                        sizeGb: sizeStringToGb(downloadSize),
-                                        position: index,
-                                      })
-                                      void startMlxDownload(model)
-                                      enterChatForDownload(
-                                        getMlxModelId(model),
-                                        'mlx'
-                                      )
-                                    } else if (variant) {
-                                      captureRecommendedClick({
-                                        modelId: variant.model_id,
-                                        format: 'GGUF',
-                                        sizeGb: sizeStringToGb(downloadSize),
-                                        position: index,
-                                      })
-                                      startDownload(model, variant, mmproj?.path)
-                                      enterChatForDownload(
-                                        variant.model_id,
-                                        LOCAL_LLAMACPP_PROVIDER as LocalLlamacppProvider
-                                      )
-                                    }
-                                  }}
-                                  className="shrink-0 rounded-full px-4"
-                                >
-                                  {/* Reserve width for the widest possible label so the
-                                  button doesn't reflow when its state flips between
-                                  Download / Downloading… / Downloaded. */}
-                                  <span className="grid">
-                                    <span
-                                      aria-hidden="true"
-                                      className="invisible col-start-1 row-start-1"
-                                    >
-                                      {t('setup:downloading')}
-                                    </span>
-                                    <span
-                                      aria-hidden="true"
-                                      className="invisible col-start-1 row-start-1"
-                                    >
-                                      {t('hub:downloaded')}
-                                    </span>
-                                    <span
-                                      aria-hidden="true"
-                                      className="invisible col-start-1 row-start-1"
-                                    >
-                                      {t('hub:download')}
-                                    </span>
-                                    <span className="col-start-1 row-start-1">
-                                      {rowDownloaded
-                                        ? t('hub:downloaded')
-                                        : rowDownloading
-                                          ? t('setup:downloading')
-                                          : t('hub:download')}
-                                    </span>
-                                  </span>
-                                </Button>
-                                {rowDownloading && rowTrackId ? (
-                                  <p
-                                    className="text-right text-xs text-muted-foreground tabular-nums"
-                                    aria-live="polite"
-                                  >
-                                    {rowDownloadProgress &&
-                                    rowDownloadProgress.total > 0
-                                      ? `${Math.round((rowDownloadProgress.progress ?? 0) * 100)}% · ${formatDownloadGb(rowDownloadProgress.current)} / ${formatDownloadGb(rowDownloadProgress.total)} GB`
-                                      : t('setup:downloadPreparing')}
-                                  </p>
-                                ) : null}
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
+                    {renderPendingRow(heroRecommendation, 0, true)}
                   </>
                 )}
 
-                {/* No Skip link: leaving empty-handed is handled by the
-                    `MODEL_STEP_AUTO_EXIT_MS` timeout, so the screen offers only
-                    the two ways to finish setup rather than a way to dodge it. */}
-                <div className="relative z-60 flex shrink-0 flex-col items-center gap-3 pt-3">
-                  {/* A user with no machine for local inference, or an existing
-                      cloud subscription, would otherwise have nothing to pick.
-                      The divider frames the two as alternatives rather than a
-                      primary and an afterthought. */}
-                  {hasCloudProviders && (
-                    <>
-                      <div className="flex w-full shrink-0 items-center gap-3">
-                        <span className="bg-border h-px flex-1" />
-                        <span className="text-muted-foreground text-xs">
-                          {t('setup:orDivider')}
-                        </span>
-                        <span className="bg-border h-px flex-1" />
-                      </div>
+                {/* Peers of the model, not a footnote under an "or".
+                    Connecting a cloud provider during onboarding is the single
+                    strongest activation signal we have, and it had happened on
+                    seven devices in the product's history because it lived
+                    below a divider that framed it as the consolation prize. */}
+                {(hasCloudProviders || subscriptionProvider) && (
+                  <div className="relative z-60 flex shrink-0 flex-col gap-2 pt-1 sm:flex-row">
+                    {hasCloudProviders && (
                       <Button
                         type="button"
                         variant="secondary"
                         size="sm"
-                        onClick={() => setCloudDialog(true)}
-                        className="relative z-60 shrink-0 rounded-full px-4"
+                        onClick={openCloudGallery}
+                        className="relative z-60 flex-1 rounded-full px-4"
                       >
                         <Cloud />
                         {t('setup:cloudStep.trigger')}
                       </Button>
-                    </>
-                  )}
+                    )}
+                    {subscriptionProvider && (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={openSubscription}
+                        className="relative z-60 flex-1 rounded-full px-4"
+                      >
+                        {t('setup:cloudStep.subscriptionTrigger')}
+                      </Button>
+                    )}
+                  </div>
+                )}
+
+                {/* The honest way out, replacing a 15-second timer that took
+                    60 % of all onboarding exits without ever showing itself.
+                    Safe to offer now that the composer asks the question again
+                    at the moment it matters (ATO-453). */}
+                <div className="flex shrink-0 justify-center pt-1">
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    onClick={() => leaveWithoutModel('dismissed')}
+                    className="text-muted-foreground hover:text-foreground h-auto py-1 text-xs hover:no-underline"
+                  >
+                    {t('setup:skip')}
+                  </Button>
                 </div>
               </div>
             </div>
@@ -1541,8 +1730,13 @@ function SetupScreen({ onSkipped }: SetupScreenProps) {
 
       <AddCloudProviderDialog
         open={cloudDialogOpen}
-        onOpenChange={setCloudDialog}
+        onOpenChange={setCloudDialogOpen}
         onKeySaved={enterChatWithCloudProvider}
+        // The subscription button must land on the sign-in, not on a gallery
+        // the user then has to find it in again.
+        initialProviderName={
+          cloudEntry === 'subscription' ? SUBSCRIPTION_PROVIDER : undefined
+        }
       />
     </div>
   )

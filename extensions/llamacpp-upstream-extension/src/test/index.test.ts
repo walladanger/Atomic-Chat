@@ -351,7 +351,10 @@ describe('llamacpp_extension', () => {
       })
     })
 
-    it('keeps an integrated-only Vulkan host on CPU', async () => {
+    it('offers Vulkan to an integrated-only Linux host the loader can see', async () => {
+      // Linux installs on the CPU build; Vulkan is the only GPU build it can
+      // move to, and a capable iGPU beats the CPU fallback. The discrete-card
+      // requirement kept such hosts on CPU for good (ATO-464).
       vi.mocked(getSystemInfo).mockResolvedValue({
         os_type: 'linux',
         os_name: 'Linux',
@@ -371,6 +374,70 @@ describe('llamacpp_extension', () => {
         cuda12: false,
         cuda13: false,
         vulkan: true,
+      })
+
+      await expect(extension['detectIdealBackendType']()).resolves.toEqual({
+        kind: 'gpu',
+        backend: 'linux-vulkan-x64',
+      })
+    })
+
+    it('offers Vulkan to a small Linux card the 6 GiB bar used to exclude', async () => {
+      vi.mocked(getSystemInfo).mockResolvedValue({
+        os_type: 'linux',
+        os_name: 'Linux',
+        total_memory: 16 * 1024,
+        cpu: { arch: 'x86_64', extensions: [] },
+        gpus: [{ ...discreteGpu, total_memory: 4 * 1024 }],
+      } as any)
+      vi.mocked(getSupportedFeaturesFromRust).mockResolvedValue({
+        cuda11: false,
+        cuda12: false,
+        cuda13: false,
+        vulkan: true,
+      })
+
+      await expect(extension['detectIdealBackendType']()).resolves.toEqual({
+        kind: 'gpu',
+        backend: 'linux-vulkan-x64',
+      })
+    })
+
+    it('asks again later when a Linux GPU is present but the Vulkan loader is not', async () => {
+      // libvulkan1 missing on a fresh install: not a verdict, and the old
+      // `cpu-optimal` answer was cached as one, so nothing ever re-checked.
+      vi.mocked(getSystemInfo).mockResolvedValue({
+        os_type: 'linux',
+        os_name: 'Linux',
+        total_memory: 32 * 1024,
+        cpu: { arch: 'x86_64', extensions: [] },
+        gpus: [{ ...discreteGpu, nvidia_info: {} }],
+      } as any)
+      vi.mocked(getSupportedFeaturesFromRust).mockResolvedValue({
+        cuda11: false,
+        cuda12: true,
+        cuda13: true,
+        vulkan: false,
+      })
+
+      await expect(extension['detectIdealBackendType']()).resolves.toEqual({
+        kind: 'detection-failed',
+      })
+    })
+
+    it('keeps a Linux host with no accelerator at all on CPU', async () => {
+      vi.mocked(getSystemInfo).mockResolvedValue({
+        os_type: 'linux',
+        os_name: 'Linux',
+        total_memory: 32 * 1024,
+        cpu: { arch: 'x86_64', extensions: [] },
+        gpus: [],
+      } as any)
+      vi.mocked(getSupportedFeaturesFromRust).mockResolvedValue({
+        cuda11: false,
+        cuda12: false,
+        cuda13: false,
+        vulkan: false,
       })
 
       await expect(extension['detectIdealBackendType']()).resolves.toEqual({
@@ -1118,86 +1185,80 @@ describe('llamacpp_extension', () => {
     })
   })
 
-  describe('migrateFitDefault', () => {
+  describe('migrateFitDefaultOn', () => {
+    const FORCED_OFF_KEY = 'llamacpp_fit_disabled_v1'
+    const MIGRATION_KEY = 'llamacpp_fit_enabled_v2'
+    const storage = (values: Record<string, string>) =>
+      vi
+        .mocked(localStorage.getItem)
+        .mockImplementation((key: string) => values[key] ?? null)
+
     beforeEach(() => {
-      vi.mocked(localStorage.getItem).mockReturnValue(null)
+      storage({})
     })
 
-    it('should skip migration if already migrated', async () => {
-      vi.mocked(localStorage.getItem).mockReturnValue('1')
-      extension['config'] = { fit: true } as any
+    it('runs once', async () => {
+      storage({ [MIGRATION_KEY]: '1', [FORCED_OFF_KEY]: '1' })
+      extension['config'] = { fit: false } as any
       extension['getSettings'] = vi.fn()
 
-      await extension['migrateFitDefault']()
+      await extension['migrateFitDefaultOn']()
 
       expect(extension['getSettings']).not.toHaveBeenCalled()
     })
 
-    it('should set migration key without calling updateSettings when fit is already false', async () => {
+    it('leaves a profile alone that the old migration never touched', async () => {
       extension['config'] = { fit: false } as any
       extension['getSettings'] = vi.fn()
       extension['updateSettings'] = vi.fn()
 
-      await extension['migrateFitDefault']()
+      await extension['migrateFitDefaultOn']()
 
-      expect(extension['getSettings']).not.toHaveBeenCalled()
       expect(extension['updateSettings']).not.toHaveBeenCalled()
-      expect(localStorage.setItem).toHaveBeenCalledWith(
-        'llamacpp_fit_disabled_v1',
-        '1'
-      )
+      expect(extension['config'].fit).toBe(false)
+      expect(localStorage.setItem).toHaveBeenCalledWith(MIGRATION_KEY, '1')
     })
 
-    it('should disable fit when it is true', async () => {
-      extension['config'] = { fit: true } as any
+    it('re-enables fit where the old migration forced it off', async () => {
+      // Nobody chose `false` on such a profile: the v1 migration wrote it for
+      // everyone. Fit is the default again, so the profile follows.
+      storage({ [FORCED_OFF_KEY]: '1' })
+      extension['config'] = { fit: false, fit_ctx: 4096, fit_target: '1024' } as any
       extension['getSettings'] = vi.fn().mockResolvedValue([
-        { key: 'fit', controllerProps: { value: true } },
+        { key: 'fit', controllerProps: { value: false } },
         { key: 'ctx_size', controllerProps: { value: 2048 } },
       ])
       extension['updateSettings'] = vi.fn().mockResolvedValue(undefined)
 
-      await extension['migrateFitDefault']()
+      await extension['migrateFitDefaultOn']()
 
-      const updatedSettings = vi.mocked(extension['updateSettings']).mock
-        .calls[0][0]
-      expect(
-        updatedSettings.find((s: any) => s.key === 'fit').controllerProps.value
-      ).toBe(false)
-      expect(
-        updatedSettings.find((s: any) => s.key === 'ctx_size').controllerProps
-          .value
-      ).toBe(2048)
-      expect(extension['config'].fit).toBe(false)
-      expect(localStorage.setItem).toHaveBeenCalledWith(
-        'llamacpp_fit_disabled_v1',
-        '1'
+      const updated = vi.mocked(extension['updateSettings']).mock.calls[0][0]
+      expect(updated.find((s: any) => s.key === 'fit').controllerProps.value).toBe(
+        true
       )
+      expect(
+        updated.find((s: any) => s.key === 'ctx_size').controllerProps.value
+      ).toBe(2048)
+      expect(extension['config'].fit).toBe(true)
+      expect(localStorage.removeItem).toHaveBeenCalledWith(FORCED_OFF_KEY)
+      expect(localStorage.setItem).toHaveBeenCalledWith(MIGRATION_KEY, '1')
     })
 
-    it('should not modify other settings during fit migration', async () => {
-      extension['config'] = { fit: true } as any
-      extension['getSettings'] = vi.fn().mockResolvedValue([
-        { key: 'fit', controllerProps: { value: true } },
-        { key: 'fit_target', controllerProps: { value: '1024' } },
-        { key: 'fit_ctx', controllerProps: { value: '' } },
-      ])
-      extension['updateSettings'] = vi.fn().mockResolvedValue(undefined)
+    it('respects a user who configured fit themselves', async () => {
+      // A non-default floor or target says fit was set up on purpose; their
+      // `false` is a choice, not the old migration's leftover.
+      storage({ [FORCED_OFF_KEY]: '1' })
+      extension['config'] = { fit: false, fit_ctx: 8192, fit_target: '1024' } as any
+      extension['getSettings'] = vi.fn()
+      extension['updateSettings'] = vi.fn()
 
-      await extension['migrateFitDefault']()
+      await extension['migrateFitDefaultOn']()
 
-      const updatedSettings = vi.mocked(extension['updateSettings']).mock
-        .calls[0][0]
-      expect(
-        updatedSettings.find((s: any) => s.key === 'fit_target').controllerProps
-          .value
-      ).toBe('1024')
-      expect(
-        updatedSettings.find((s: any) => s.key === 'fit_ctx').controllerProps
-          .value
-      ).toBe('')
+      expect(extension['updateSettings']).not.toHaveBeenCalled()
+      expect(extension['config'].fit).toBe(false)
+      expect(localStorage.setItem).toHaveBeenCalledWith(MIGRATION_KEY, '1')
     })
   })
-
   describe('getLoadedModels', () => {
     it('should return list of loaded models', async () => {
       const { invoke } = await import('@tauri-apps/api/core')
@@ -2040,6 +2101,8 @@ describe('llamacpp_extension', () => {
           AppEvent.onBetterBackendDetected,
           result
         )
+        // A recommendation was produced, so there is no "why nothing" to give.
+        expect(extension.getLastRecheckOutcome()).toBeNull()
       })
 
       it('returns nothing and forgets any stale recommendation when already optimal', async () => {
@@ -2065,6 +2128,10 @@ describe('llamacpp_extension', () => {
           'llama_cpp_better_backend_recommendation',
           expect.anything()
         )
+        // The healthy outcome, and almost certainly the most common one. It
+        // used to reach telemetry as the same `no_recommendation` as a genuine
+        // gap in the catalog, which is why that number could not be read.
+        expect(extension.getLastRecheckOutcome()).toBe('already_optimal')
       })
 
       it('returns nothing when CPU genuinely is the best this host can do', async () => {
@@ -2078,6 +2145,25 @@ describe('llamacpp_extension', () => {
           OPTIMAL_BACKEND_CACHE_KEY,
           expect.any(String)
         )
+        expect(extension.getLastRecheckOutcome()).toBe('cpu_optimal')
+      })
+
+      it('says the catalog had nothing for the detected type', async () => {
+        vi.spyOn(extension as any, 'detectIdealBackendType').mockResolvedValue({
+          kind: 'gpu',
+          backend: 'win-cuda-13.3-x64',
+        })
+        // Detection picked a tier the catalog cannot serve.
+        vi.spyOn(
+          extension as any,
+          'resolveConcreteOptimalBackend'
+        ).mockResolvedValue(null)
+
+        await expect(extension.recheckOptimalBackend()).resolves.toBeNull()
+
+        // A gap on our side, not a property of the machine — the distinction
+        // the single `no_recommendation` value used to erase.
+        expect(extension.getLastRecheckOutcome()).toBe('no_catalog_entry')
       })
 
       it('raises a distinct signal when detection could not complete', async () => {

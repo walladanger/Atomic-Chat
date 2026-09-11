@@ -23,6 +23,9 @@ import {
   DownloadEvent,
   chatCompletionRequestMessage,
   computeNextCtxLen,
+  DEFAULT_CTX_LEN,
+  detectReasoningControls,
+  ReasoningControls,
   ModelEvent,
 } from '@janhq/core'
 
@@ -54,6 +57,13 @@ import {
 } from './backend'
 import { invoke, Channel } from '@tauri-apps/api/core'
 import {
+  TRANSCRIPTION_IDLE_UNLOAD_MS,
+  TRANSCRIPTION_LOAD_OVERRIDES,
+  TRANSCRIPTION_MMPROJ_URL,
+  TRANSCRIPTION_MODEL_ID,
+  TRANSCRIPTION_MODEL_URL,
+} from './transcriptionRegistry'
+import {
   getProxyConfig,
   buildEmbedBatches,
   mergeEmbedResponses,
@@ -68,6 +78,7 @@ import {
   effectiveCtxSize,
   ggufShardSetPaths,
   isEmbeddingGguf,
+  classifyProjector,
   parseGgufShard,
   type EmbedBatchResult,
 } from './util'
@@ -119,6 +130,7 @@ import {
   getRuntimeDevice,
   availableDiskSpace,
 } from '../../../src-tauri/plugins/tauri-plugin-llamacpp-upstream/guest-js/index'
+import type { RuntimeDeviceInfo } from '../../../src-tauri/plugins/tauri-plugin-llamacpp-upstream/guest-js/types'
 
 // Error message constant - matches web-app/src/utils/error.ts
 const OUT_OF_CONTEXT_SIZE = 'the request exceeds the available context size.'
@@ -160,6 +172,12 @@ const AUTO_INCREASE_CTX_AT_MAX = 'local_backend://auto_increase_ctx_at_max'
 /// llama.cpp/libmtmd build cannot parse (e.g. Gemma 4 `gemma4a` audio).
 /// On this error we retry the load text-only (without --mmproj).
 const ERR_MULTIMODAL_PROJECTOR_LOAD_FAILED = 'MULTIMODAL_PROJECTOR_LOAD_FAILED'
+/// The voice model has not been downloaded yet. The UI turns this into the
+/// install prompt rather than an error toast.
+const ERR_TRANSCRIPTION_MODEL_MISSING = 'TRANSCRIPTION_MODEL_MISSING'
+/// The running backend cannot execute the voice model's audio projector.
+/// Terminal — unlike vision, there is no useful text-only fallback.
+const ERR_TRANSCRIPTION_UNSUPPORTED = 'TRANSCRIPTION_UNSUPPORTED'
 const DFLASH_SPEC_TYPE = 'draft-dflash'
 /// ATO-187: the model / mmproj GGUF is missing on disk (an interrupted
 /// download that never produced the final file, a file removed outside the
@@ -489,6 +507,11 @@ export type OptimalBackendCacheRecord =
  */
 export const BACKEND_DETECTION_FAILED = 'BACKEND_DETECTION_FAILED'
 
+/// Smallest Vulkan device worth moving a Linux host off the CPU build for.
+/// Below this the KV cache of even the lightest recommended model does not
+/// fit beside the weights, and Vulkan would spill straight back to RAM.
+const LINUX_VULKAN_MIN_VRAM_MIB = 2 * 1024
+
 export default class llamacpp_upstream_extension extends AIEngine {
   provider: string = 'llamacpp-upstream'
   autoUnload: boolean = false
@@ -523,6 +546,10 @@ export default class llamacpp_upstream_extension extends AIEngine {
   /// to an installed backend without persisting the swap — the case where the
   /// settings dropdown keeps showing a backend that is not running.
   private effectiveVersionBackend: string | null = null
+  /// Unloads the voice model once dictation has been idle long enough. It
+  /// runs alongside the chat model, so leaving ~3 GB resident forever after
+  /// one dictation would be rude.
+  private transcriptionIdleTimer?: ReturnType<typeof setTimeout>
 
   /**
    * Returns the provider-scoped optimal-backend cache when its schema and
@@ -702,8 +729,8 @@ export default class llamacpp_upstream_extension extends AIEngine {
     // upstream provider — vanilla ggml-org/llama.cpp does not implement the
     // turboquant KV types.
 
-    // Migration v3: disable fit by default
-    await this.migrateFitDefault()
+    // Fit on by default; undo the migration that once forced it off.
+    await this.migrateFitDefaultOn()
 
     this.timeout = this.config.timeout
     this.llamacpp_env = this.config.llamacpp_env
@@ -933,24 +960,41 @@ export default class llamacpp_upstream_extension extends AIEngine {
     localStorage.setItem(MIGRATION_KEY, '1')
   }
 
-  private async migrateFitDefault(): Promise<void> {
-    const MIGRATION_KEY = 'llamacpp_fit_disabled_v1'
+  /**
+   * Fit is on by default (ATO-465). A one-shot migration used to force it
+   * OFF for everyone — including users who had turned it on — so a profile
+   * that went through it carries `fit: false` without anyone having chosen
+   * that. Undo it once, but only where nothing else about fit was touched:
+   * a non-default floor or target says the user configured fit on purpose,
+   * and their `false` stands.
+   */
+  private async migrateFitDefaultOn(): Promise<void> {
+    const MIGRATION_KEY = 'llamacpp_fit_enabled_v2'
+    const FORCED_OFF_KEY = 'llamacpp_fit_disabled_v1'
     if (localStorage.getItem(MIGRATION_KEY)) return
 
-    if (this.config.fit === true) {
+    const forcedOff = localStorage.getItem(FORCED_OFF_KEY) !== null
+    const fitCtx = String(this.config.fit_ctx ?? '').trim()
+    const fitTarget = String(this.config.fit_target ?? '').trim()
+    const untouched =
+      (fitCtx === '' || fitCtx === '4096') &&
+      (fitTarget === '' || fitTarget === '1024')
+
+    if (forcedOff && this.config.fit === false && untouched) {
       const settings = await this.getSettings()
       await this.updateSettings(
         settings.map((item) => {
           if (item.key === 'fit') {
-            item.controllerProps.value = false
+            item.controllerProps.value = true
           }
           return item
         })
       )
-      this.config.fit = false
-      logger.info('Migrated fit setting: disabled by default')
+      this.config.fit = true
+      logger.info('Re-enabled fit: it had been forced off by a migration')
     }
 
+    localStorage.removeItem(FORCED_OFF_KEY)
     localStorage.setItem(MIGRATION_KEY, '1')
   }
 
@@ -1871,17 +1915,28 @@ export default class llamacpp_upstream_extension extends AIEngine {
       // a 404 at download time. `determine_supported_backends` in the
       // Rust plugin mirrors this matrix.
       if (sysInfo.os_type === 'linux') {
-        if (
-          features.vulkan &&
-          hasEnoughVram &&
-          archSuffix === 'x64' &&
-          !integratedGpuOnly
-        ) {
+        // Linux installs on the CPU build, and Vulkan is the only GPU build
+        // there is to upgrade to. The gate used to demand a discrete card
+        // with 6 GiB, and a host that failed it was `cpu-optimal` for good —
+        // nothing ever asked again. Measured on this platform Vulkan is a
+        // third of CUDA's throughput and radically more than the CPU
+        // fallback, so a 4 GB card or a capable integrated GPU is worth it
+        // (ATO-464). Only a device the loader can actually see qualifies:
+        // `features.vulkan` means libvulkan.so.1 loaded AND enumerated it.
+        const anyVulkanDevice = sysInfo.gpus.some(
+          (g) => g.total_memory >= LINUX_VULKAN_MIN_VRAM_MIB
+        )
+        if (features.vulkan && archSuffix === 'x64' && anyVulkanDevice) {
           return { kind: 'gpu', backend: 'linux-vulkan-x64' }
         }
-        // Linux detection consults no network stream (the Vulkan recommend
-        // is derived purely from the Rust libvulkan probe), so a non-GPU
-        // outcome here is genuinely CPU-optimal, never a fetch failure.
+        // The hardware plugin sees a GPU but the Vulkan loader does not: a
+        // fresh install without libvulkan1, or a driver still settling.
+        // Not a verdict — ask again next launch instead of pinning the host
+        // to CPU for the life of the profile.
+        if (!features.vulkan && archSuffix === 'x64' && sysInfo.gpus.length > 0) {
+          return { kind: 'detection-failed' }
+        }
+        // No accelerator at all: the CPU build is the right build.
         return { kind: 'cpu-optimal' }
       }
 
@@ -2450,6 +2505,27 @@ export default class llamacpp_upstream_extension extends AIEngine {
    * Returns the recommendation payload, or `null` when the device is already
    * on the optimal backend category (or detection couldn't decide).
    */
+  /**
+   * Why the last `recheckOptimalBackend()` returned null.
+   *
+   * The method returns `null` for four unrelated reasons — this is a Mac, CPU
+   * genuinely is the best this hardware can do, the optimal build is already
+   * installed, or the catalog has no entry for the detected type — and the
+   * return type cannot distinguish them. All four arrived in telemetry as the
+   * single value `no_recommendation`, so "46% of users who reach the Windows
+   * backend step get no recommendation" could not be read: `already_optimal`
+   * is a healthy outcome and is probably the most common of the four.
+   *
+   * Recorded rather than returned because the method has three callers and is
+   * not worth an API break for telemetry. Read via `getLastRecheckOutcome()`.
+   */
+  private lastRecheckOutcome: string | null = null
+
+  /** See `lastRecheckOutcome`. */
+  getLastRecheckOutcome(): string | null {
+    return this.lastRecheckOutcome
+  }
+
   async recheckOptimalBackend(): Promise<{
     currentBackend: string
     recommendedBackend: string
@@ -2459,8 +2535,10 @@ export default class llamacpp_upstream_extension extends AIEngine {
     backendId: string
   } | null> {
     if (IS_MAC) {
+      this.lastRecheckOutcome = 'mac'
       return null
     }
+    this.lastRecheckOutcome = null
     try {
       logger.info('recheckOptimalBackend: detecting ideal backend type')
       // ATO-104: bound the whole hardware/backend detection so the
@@ -2500,6 +2578,7 @@ export default class llamacpp_upstream_extension extends AIEngine {
         )
         this.persistOptimalBackendCache(detection, currentBackend)
         localStorage.removeItem('llama_cpp_better_backend_recommendation')
+        this.lastRecheckOutcome = 'cpu_optimal'
         return null
       }
 
@@ -2520,6 +2599,7 @@ export default class llamacpp_upstream_extension extends AIEngine {
           currentBackend
         )
         localStorage.removeItem('llama_cpp_better_backend_recommendation')
+        this.lastRecheckOutcome = 'already_optimal'
         return null
       }
 
@@ -2538,6 +2618,9 @@ export default class llamacpp_upstream_extension extends AIEngine {
         recommendedBackend
       )
       if (!recommendedBackend) {
+        // The catalog has nothing for the type detection picked — a gap on our
+        // side, not a property of the machine.
+        this.lastRecheckOutcome = 'no_catalog_entry'
         localStorage.removeItem('llama_cpp_better_backend_recommendation')
         return null
       }
@@ -2546,6 +2629,7 @@ export default class llamacpp_upstream_extension extends AIEngine {
           `recheckOptimalBackend: latest resolved backend is already active (${currentBackend})`
         )
         localStorage.removeItem('llama_cpp_better_backend_recommendation')
+        this.lastRecheckOutcome = 'already_optimal'
         return null
       }
 
@@ -2578,6 +2662,7 @@ export default class llamacpp_upstream_extension extends AIEngine {
         throw err
       }
       logger.warn('recheckOptimalBackend failed:', err)
+      this.lastRecheckOutcome = 'threw'
       return null
     }
   }
@@ -3189,6 +3274,159 @@ export default class llamacpp_upstream_extension extends AIEngine {
     return isEmbedding
   }
 
+  /**
+   * Which modality a model's mmproj carries, cached in model.yml.
+   *
+   * Mirrors `resolveEmbeddingConfig`: read the projector GGUF once, then never
+   * again. Without the cache this would parse a multi-hundred-megabyte file on
+   * every `list()`.
+   */
+  private async resolveProjectorKind(
+    modelId: string,
+    modelConfig: ModelConfig
+  ): Promise<{ vision: boolean; audio: boolean }> {
+    if (
+      typeof modelConfig.projector_vision === 'boolean' &&
+      typeof modelConfig.projector_audio === 'boolean'
+    ) {
+      return {
+        vision: modelConfig.projector_vision,
+        audio: modelConfig.projector_audio,
+      }
+    }
+
+    // Default matches the behaviour that predates this method: an unreadable
+    // projector stays a vision projector rather than losing its capability.
+    let kind = { vision: true, audio: false }
+    try {
+      const janDataFolderPath = await getJanDataFolderPath()
+      const fullMmprojPath = await joinPath([
+        janDataFolderPath,
+        modelConfig.mmproj_path,
+      ])
+      if (await fs.existsSync(fullMmprojPath)) {
+        const metadata = await readGgufMetadata(fullMmprojPath)
+        kind = classifyProjector(metadata.metadata)
+      }
+    } catch (e) {
+      logger.warn(`Failed to classify projector for ${modelId}`, e)
+      return kind
+    }
+
+    try {
+      const configPath = await joinPath([
+        await this.getModelsRootPath(),
+        modelId,
+        'model.yml',
+      ])
+      modelConfig.projector_vision = kind.vision
+      modelConfig.projector_audio = kind.audio
+      await invoke<void>('write_yaml', {
+        data: modelConfig,
+        savePath: configPath,
+      })
+    } catch (e) {
+      logger.warn(`Failed to cache projector kind for ${modelId}`, e)
+    }
+
+    return kind
+  }
+
+  /**
+   * Bring up the voice model, reusing a live session when there is one.
+   *
+   * Loaded with `bypassAutoUnload` so it runs *alongside* the user's chat model
+   * rather than evicting it — dictation that silently unloaded the model you
+   * were talking to would be a nasty surprise. The matching exclusion in
+   * `performLoad`'s auto-unload keeps it alive when the next chat model loads.
+   */
+  async ensureTranscriptionModel(
+    bypassAutoUnload: boolean = true
+  ): Promise<SessionInfo> {
+    const existing = await this.findSessionByModel(TRANSCRIPTION_MODEL_ID)
+    if (existing) {
+      this.touchTranscriptionIdleTimer()
+      return existing
+    }
+
+    const installed = await this.list()
+    if (!installed.some((model) => model.id === TRANSCRIPTION_MODEL_ID)) {
+      const error = new Error(
+        'The voice model is not installed.'
+      ) as Error & { code?: string }
+      error.code = ERR_TRANSCRIPTION_MODEL_MISSING
+      throw error
+    }
+
+    // `bypassAutoUnload: false` lets the ordinary auto-unload evict the chat
+    // model first — the escape hatch for machines that cannot hold both.
+    const sInfo = await this.load(
+      TRANSCRIPTION_MODEL_ID,
+      { ...TRANSCRIPTION_LOAD_OVERRIDES } as Partial<LlamacppConfig>,
+      false,
+      bypassAutoUnload
+    )
+
+    await this.assertAudioModality(sInfo)
+    this.touchTranscriptionIdleTimer()
+    return sInfo
+  }
+
+  /**
+   * Confirm the loaded server really exposes an audio encoder.
+   *
+   * A *missing* `audio` key is treated as unknown and allowed through: older
+   * builds do not report modalities at all, and the first real segment will
+   * give a much clearer error than a spurious refusal here. Only an explicit
+   * `false` is fatal.
+   */
+  private async assertAudioModality(sInfo: SessionInfo): Promise<void> {
+    try {
+      const response = await globalThis.fetch(
+        `http://localhost:${sInfo.port}/props`,
+        { headers: { Authorization: `Bearer ${sInfo.api_key}` } }
+      )
+      if (!response.ok) return
+      const props = (await response.json()) as {
+        modalities?: { audio?: boolean }
+      }
+      if (props?.modalities?.audio === false) {
+        const error = new Error(
+          'This llama.cpp build cannot run the voice model\'s audio encoder.'
+        ) as Error & { code?: string }
+        error.code = ERR_TRANSCRIPTION_UNSUPPORTED
+        throw error
+      }
+    } catch (e) {
+      if ((e as { code?: string })?.code === ERR_TRANSCRIPTION_UNSUPPORTED) {
+        throw e
+      }
+      // A probe failure is not evidence of anything; let the first segment
+      // decide.
+      logger.warn('Could not read /props for the voice model', e)
+    }
+  }
+
+  /** Keep the voice model alive while dictation is in use. */
+  touchTranscriptionIdleTimer(): void {
+    if (this.transcriptionIdleTimer) {
+      clearTimeout(this.transcriptionIdleTimer)
+    }
+    this.transcriptionIdleTimer = setTimeout(() => {
+      this.transcriptionIdleTimer = undefined
+      void this.unload(TRANSCRIPTION_MODEL_ID).catch(() => {})
+    }, TRANSCRIPTION_IDLE_UNLOAD_MS)
+  }
+
+  /** Drop the voice model now, e.g. when the user removes it. */
+  async releaseTranscriptionModel(): Promise<void> {
+    if (this.transcriptionIdleTimer) {
+      clearTimeout(this.transcriptionIdleTimer)
+      this.transcriptionIdleTimer = undefined
+    }
+    await this.unload(TRANSCRIPTION_MODEL_ID).catch(() => {})
+  }
+
   // Implement the required LocalProvider interface methods
   override async list(): Promise<modelInfo[]> {
     const modelsDir = await this.getModelsRootPath()
@@ -3240,9 +3478,13 @@ export default class llamacpp_upstream_extension extends AIEngine {
         modelConfig
       )
 
+      // An mmproj is not automatically a *vision* projector: Voxtral's is a
+      // Whisper-style audio encoder. Ask the projector which it is.
       const capabilities: string[] = []
       if (modelConfig.mmproj_path) {
-        capabilities.push('vision')
+        const projector = await this.resolveProjectorKind(modelId, modelConfig)
+        if (projector.vision) capabilities.push('vision')
+        if (projector.audio) capabilities.push('audio_to_text')
       }
 
       // Broken-link detection: flag a missing weights file so the UI marks it and auto-start skips it.
@@ -3780,15 +4022,35 @@ export default class llamacpp_upstream_extension extends AIEngine {
       )
     }
 
+    // A Tauri command rejects with a bare string, so the step that failed and
+    // the path it failed on are both lost by the time the toast renders — which
+    // is why every import failure on Windows read "unknown error" and nothing
+    // reached the log (issue #256). Name each step on the way out.
+    const step = async <T>(what: string, run: () => Promise<T>): Promise<T> => {
+      try {
+        return await run()
+      } catch (error) {
+        const reason =
+          error instanceof Error ? error.message : String(error ?? 'unknown')
+        logger.error(`import(${modelId}): ${what} failed: ${reason}`)
+        throw new Error(`${what} failed: ${reason}`)
+      }
+    }
+
     // Calculate file sizes. A sharded model is the sum of its parts; quoting
     // only the first shard would advertise a 150 GB model as a few megabytes.
     let size_bytes = 0
     for (const shard of ggufShardSetPaths(fullModelPath)) {
-      size_bytes += (await fs.fileStat(shard)).size
+      size_bytes += (
+        await step(`reading ${shard}`, () => fs.fileStat(shard))
+      ).size
     }
     if (mmprojPath) {
+      const fullMmprojPath = await joinPath([janDataFolderPath, mmprojPath])
       size_bytes += (
-        await fs.fileStat(await joinPath([janDataFolderPath, mmprojPath]))
+        await step(`reading ${fullMmprojPath}`, () =>
+          fs.fileStat(fullMmprojPath)
+        )
       ).size
     }
 
@@ -3814,13 +4076,19 @@ export default class llamacpp_upstream_extension extends AIEngine {
       embedding: isEmbedding,
       ...(importSource ? { source: importSource } : {}),
     } as ModelConfig
-    await fs.mkdir(await joinPath([janDataFolderPath, modelDir]))
-    await invoke<void>('write_yaml', {
-      data: modelConfig,
-      savePath: configPath,
-    })
+    const fullModelDir = await joinPath([janDataFolderPath, modelDir])
+    await step(`creating ${fullModelDir}`, () => fs.mkdir(fullModelDir))
+    await step(`writing ${configPath}`, () =>
+      invoke<void>('write_yaml', {
+        data: modelConfig,
+        savePath: configPath,
+      })
+    )
     events.emit(AppEvent.onModelImported, {
       modelId,
+      // Both llama.cpp providers list the same GGUF dir, so the web-app
+      // cannot tell from `modelId` alone which engine imported the file.
+      provider: this.provider,
       modelPath,
       mmprojPath,
       size_bytes,
@@ -4498,9 +4766,17 @@ export default class llamacpp_upstream_extension extends AIEngine {
           })
         )
 
+        // The voice model is an app-internal companion, not a chat model:
+        // it is loaded with `bypassAutoUnload` precisely so it can sit
+        // alongside whatever the user is chatting with. Excluding it here is
+        // the other half of that — otherwise the next chat-model load would
+        // silently kill dictation mid-sentence.
         const nonEmbeddingModels: string[] = sessionInfos
           .filter(
-            (s): s is SessionInfo => s !== null && s.is_embedding === false
+            (s): s is SessionInfo =>
+              s !== null &&
+              s.is_embedding === false &&
+              s.model_id !== TRANSCRIPTION_MODEL_ID
           )
           .map((s) => s.model_id)
 
@@ -4881,7 +5157,14 @@ export default class llamacpp_upstream_extension extends AIEngine {
       // dropping --mmproj. This keeps the model usable instead of failing the
       // whole load with an opaque error. See issue #44.
       const code = (error as { code?: string } | undefined)?.code
-      if (mmprojPath && code === ERR_MULTIMODAL_PROJECTOR_LOAD_FAILED) {
+      // For the voice model the projector *is* the feature: a text-only
+      // retry would produce a server that starts cleanly and can never
+      // transcribe. Let the error through so the caller can say so.
+      if (
+        mmprojPath &&
+        code === ERR_MULTIMODAL_PROJECTOR_LOAD_FAILED &&
+        modelId !== TRANSCRIPTION_MODEL_ID
+      ) {
         logger.warn(
           `Model "${modelId}" has an unsupported multimodal projector for backend "${backend}". Retrying text-only (without --mmproj).`
         )
@@ -5230,8 +5513,22 @@ export default class llamacpp_upstream_extension extends AIEngine {
         return
       }
 
+      // With fit on, the context is what llama.cpp found room for at load.
+      // Reloading with a bigger `ctx_size` would be dropped by the argument
+      // builder (`--ctx-size` is not emitted under fit) and fit would size it
+      // again — a reload that changes nothing. The ladder is fit-off only.
+      if (this.config?.fit === true) {
+        await sendDone({ ok: false, reason: 'fit' })
+        logger.info(
+          `auto_increase_ctx: fit is on for ${model_id}; the engine sizes the context itself`
+        )
+        return
+      }
+
       const currentCtxLen =
-        this.modelCtxSize.get(model_id) ?? this.config?.ctx_size ?? 8192
+        this.modelCtxSize.get(model_id) ??
+        this.config?.ctx_size ??
+        DEFAULT_CTX_LEN
       const maxCtxLen = this.modelMaxCtxTrain.get(model_id)
       const newCtxLen = computeNextCtxLen(currentCtxLen, maxCtxLen)
 
@@ -6486,6 +6783,30 @@ export default class llamacpp_upstream_extension extends AIEngine {
     }
   }
 
+  /// Which device the loaded model actually ran on.
+  ///
+  /// Parsed from the llama-server startup log by the plugin and, until now,
+  /// used only to warn about a backend mismatch. The web-app needs it for
+  /// `model_load`: `n_gpu_layers` there is the requested value — the "offload
+  /// everything" sentinel on 98.3% of events — so how many layers reached the
+  /// GPU, and whether a CUDA build quietly ran on CPU, was recorded nowhere.
+  ///
+  /// Never throws: telemetry must not be able to break a load.
+  async getRuntimeDeviceInfo(
+    modelId: string
+  ): Promise<RuntimeDeviceInfo | null> {
+    try {
+      const sInfo = await this.findSessionByModel(modelId)
+      if (!sInfo) return null
+      // `load_tensors` normally precedes "listening on", but on a slow mmap
+      // the snapshot taken at readiness can still be empty — re-ask.
+      return sInfo.runtime_device ?? (await getRuntimeDevice(sInfo.pid))
+    } catch (e) {
+      logger.debug('getRuntimeDeviceInfo failed (continuing):', e)
+      return null
+    }
+  }
+
   private async findSessionByModel(modelId: string): Promise<SessionInfo> {
     try {
       let sInfo = await invoke<SessionInfo>(
@@ -6860,6 +7181,36 @@ export default class llamacpp_upstream_extension extends AIEngine {
   }
 
   /**
+   * Report the reasoning controls declared by the model's GGUF chat template.
+   * @param modelId
+   * @returns
+   */
+  async getReasoningControls(modelId: string): Promise<ReasoningControls> {
+    try {
+      const janDataFolderPath = await getJanDataFolderPath()
+      const modelConfigPath = await joinPath([
+        await this.getModelsRootPath(),
+        modelId,
+        'model.yml',
+      ])
+      const modelConfig = await invoke<ModelConfig>('read_yaml', {
+        path: modelConfigPath,
+      })
+      const modelPath = await joinPath([
+        janDataFolderPath,
+        modelConfig.model_path,
+      ])
+      const metadata = await readGgufMetadata(modelPath)
+      return detectReasoningControls(
+        metadata.metadata?.['tokenizer.chat_template']
+      )
+    } catch (e) {
+      logger.warn(`Failed to detect reasoning controls for ${modelId}: ${e}`)
+      return { supportsThinking: false }
+    }
+  }
+
+  /**
    * Check the support status of a model by its path (local/remote)
    *
    * Returns:
@@ -6872,7 +7223,14 @@ export default class llamacpp_upstream_extension extends AIEngine {
     ctxSize?: number
   ): Promise<'RED' | 'YELLOW' | 'GREEN'> {
     try {
-      const result = await isModelSupported(path, Number(ctxSize))
+      // The cache types this engine loads with: the estimate used to assume
+      // fp16 and went red on models a quantised cache fits comfortably.
+      const result = await isModelSupported(
+        path,
+        Number(ctxSize),
+        this.config.cache_type_k,
+        this.config.cache_type_v
+      )
       return result
     } catch (e) {
       throw new Error(String(e))

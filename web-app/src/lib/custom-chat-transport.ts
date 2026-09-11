@@ -6,6 +6,7 @@ import {
   type ChatRequestOptions,
   type ChatTransport,
   type LanguageModel,
+  type ModelMessage,
   type UIMessageChunk,
   type Tool,
   type LanguageModelUsage,
@@ -16,6 +17,7 @@ import { prepareToolResultImagesForModel } from './toolResultImages'
 import {
   buildToolsRecord,
   splitAnthropicSerialToolUse,
+  withGrammarSafeToolSchemas,
 } from './custom-chat-transport-helpers'
 import type { MCPTool } from '@/types/completion'
 
@@ -50,10 +52,12 @@ const stripSpecialTokensTransform = () =>
   })
 import { useServiceStore } from '@/hooks/useServiceHub'
 import { useToolAvailable } from '@/hooks/useToolAvailable'
+import { SYSTEM_SERVER_KEYS } from '@/constants/mcp-connectors'
 import { ModelFactory } from './model-factory'
 import { useModelProvider } from '@/hooks/useModelProvider'
 import { getSamplingParamsForThread } from '@/lib/samplingParams'
 import { withRecommendedSampling } from '@/lib/predefinedParams'
+import { buildReasoningRequestFields } from '@/lib/reasoning-effort'
 import { useGeneralSetting } from '@/hooks/useGeneralSetting'
 import { useThreads } from '@/hooks/useThreads'
 import { useAttachments } from '@/hooks/useAttachments'
@@ -61,10 +65,35 @@ import { useAppState } from '@/hooks/useAppState'
 import { ExtensionManager } from '@/lib/extension'
 import { ExtensionTypeEnum, VectorDBExtension } from '@janhq/core'
 import { ttftMark } from '@/lib/ttft-timing'
+import {
+  growModelContext,
+  readAutoIncreaseCtx,
+  readModelCtxLen,
+} from '@/lib/context-size'
+import {
+  DEFAULT_OUTPUT_RESERVE_TOKENS,
+  PREFLIGHT_CTX_THRESHOLD,
+  estimatePromptTokensHeuristic,
+  estimateToolsTokens,
+  toOpenAiMessages,
+  toOpenAiTools,
+} from '@/lib/prompt-size'
+import { OUT_OF_CONTEXT_SIZE } from '@/utils/error'
+import { summarizeToolCost } from '@/lib/tool-cost'
 import { extractModelErrorMessage } from '@/lib/modelErrorMessage'
+import {
+  collectSkillNamesFromMessages,
+  composeSystemMessage,
+  loadChatSkillDetails,
+  renderChatSkillsBlock,
+} from '@/lib/chat-skill-injection'
+import type { AgentSkillDetail } from '@/services/agent/skills'
 import type { ServiceHub } from '@/services'
 import { ensureRemoteProviderReady } from '@/utils/ensureRemoteProviderReady'
-import { isLocalProvider as isLocalProviderName } from '@/utils/registerRemoteProvider'
+import {
+  isLocalProvider as isLocalProviderName,
+  isSubscriptionProvider,
+} from '@/utils/registerRemoteProvider'
 
 /// Local inference backends (mlx, llamacpp, llamacpp-upstream,
 /// foundation-models) get special handling at the `streamText` boundary:
@@ -85,6 +114,16 @@ const LOCAL_INFERENCE_PROVIDERS = new Set<string>([
   'llamacpp',
   'llamacpp-upstream',
   'foundation-models',
+])
+
+/// Engines that constrain sampling with a GBNF grammar compiled from the tool
+/// schemas — the ones that need `withGrammarSafeToolSchemas`. `llamacpp-server`
+/// is a self-hosted llama.cpp behind an OpenAI-compatible URL, so it builds the
+/// same grammar as the bundled engines and hits the same limits.
+const GRAMMAR_CONSTRAINED_PROVIDERS = new Set<string>([
+  'llamacpp',
+  'llamacpp-upstream',
+  'llamacpp-server',
 ])
 
 /// Map an audio MIME type to the `format` string expected by the OpenAI-style
@@ -198,6 +237,28 @@ export function foldSystemIntoFirstUserMessage<
   return copy
 }
 
+/**
+ * Drop the `tool-*` parts of assistant messages produced by the agent engine
+ * (`metadata.agent_run`). Their tool names exist only in the Rust loop and
+ * their states include values (`output-denied`) the AI-SDK converters do not
+ * accept, so on a mixed-engine thread a fallback turn would otherwise send
+ * unknown `tool_use` blocks to the provider. The text and reasoning survive —
+ * that is the part of the exchange the next turn needs.
+ */
+export function stripAgentRunToolParts<T extends UIMessage>(
+  messages: T[]
+): T[] {
+  return messages.map((message) => {
+    const metadata = message.metadata as Record<string, unknown> | undefined
+    if (!metadata?.agent_run) return message
+    const parts = message.parts?.filter(
+      (part) => !part.type.startsWith('tool-') && part.type !== 'dynamic-tool'
+    )
+    if (!parts || parts.length === (message.parts?.length ?? 0)) return message
+    return { ...message, parts }
+  })
+}
+
 export function shouldSuppressToolsForUpstreamDflash(
   providerId: string,
   settings: readonly ProviderSetting[] | undefined
@@ -249,7 +310,7 @@ export function withUpstreamDflashReasoningOverride(
       ...existingTemplateKwargs,
       enable_thinking: false,
     },
-    reasoning_budget: 0,
+    reasoning_budget_tokens: 0,
   }
 }
 
@@ -261,6 +322,35 @@ export type StreamingTokenSpeedCallback = (
   tokenCount: number,
   elapsedMs: number
 ) => void
+
+export function resolveTokenSpeed({
+  providerId,
+  providerReportedSpeed,
+  outputTokens,
+  durationSec,
+}: {
+  providerId: string
+  providerReportedSpeed: number
+  outputTokens: number
+  durationSec: number
+}): number {
+  if (providerReportedSpeed > 0) return providerReportedSpeed
+
+  // The ChatGPT subscription bridge receives Responses API `output_tokens`,
+  // which may include hidden reasoning, but it can time only visible text or
+  // reasoning-summary deltas. Dividing those unlike values produced impossible
+  // rates for short or reasoning-heavy turns. The subscription endpoint does
+  // not expose decode timing, so leave TPS unavailable instead of fabricating
+  // a wall-clock estimate.
+  if (isSubscriptionProvider(providerId)) return 0
+
+  if (durationSec > 0 && outputTokens > 0) {
+    return outputTokens / durationSec
+  }
+
+  return 0
+}
+
 export type OnFinishCallback = (params: {
   message: UIMessage
   isAbort?: boolean
@@ -325,6 +415,9 @@ export class CustomChatTransport implements ChatTransport<UIMessage> {
   private continueFromContent: string | null = null
   private toolsCacheKey = ''
   private toolsCacheValid = false
+  // Invoked-skill bodies, memoized for the transport's (per-thread) lifetime;
+  // null marks a skill known to be unusable on the chat pipeline.
+  private skillDetailCache = new Map<string, AgentSkillDetail | null>()
 
   constructor(systemMessage?: string, threadId?: string) {
     this.systemMessage = systemMessage
@@ -383,15 +476,29 @@ export class CustomChatTransport implements ChatTransport<UIMessage> {
   ): string {
     const mcp = [...useAppState.getState().mcpToolNames].sort().join(',')
     const rag = [...useAppState.getState().ragToolNames].sort().join(',')
+    const muted = [...this.mutedServersForThread()].sort().join(',')
+    // The cost report is measured against the selected model's window, so
+    // a context change must rebuild it even when the tool set is unchanged.
+    const ctxLen = readModelCtxLen(useModelProvider.getState().selectedModel)
     return [
       this.threadId ?? '',
       hasDocuments,
       ragFeatureAvailable,
       modelSupportsTools,
       disabledToolKeys.join(','),
+      muted,
+      ctxLen ?? '',
       mcp,
       rag,
     ].join('|')
+  }
+
+  /** Connectors the user switched off for this chat (see `useToolAvailable`). */
+  private mutedServersForThread(): string[] {
+    const store = useToolAvailable.getState()
+    return this.threadId
+      ? store.getMutedServersForThread(this.threadId)
+      : store.getDefaultMutedServers()
   }
 
   async refreshTools(force = false) {
@@ -490,9 +597,34 @@ export class CustomChatTransport implements ChatTransport<UIMessage> {
       }
     }
 
-    this.tools = buildToolsRecord(ragTools, mcpTools, disabledToolKeys)
+    // System servers (filesystem, fetch, …) are agent-mode tooling: the
+    // agent engine reads them from its own catalog, a chat never sends them.
+    const muted = new Set([
+      ...this.mutedServersForThread(),
+      ...SYSTEM_SERVER_KEYS,
+    ])
+    const audibleMcpTools = mcpTools.filter((tool) => !muted.has(tool.server))
+
+    this.tools = buildToolsRecord(ragTools, audibleMcpTools, disabledToolKeys)
     this.toolsCacheKey = cacheKey
     this.toolsCacheValid = true
+
+    // What the tool block costs, per connector, for the plugins menu and the
+    // composer hint. Measured on what is actually sent (muted/disabled tools
+    // excluded), against the selected model's context window.
+    const disabled = new Set(disabledToolKeys)
+    const sentTools = audibleMcpTools.filter(
+      (tool) => !disabled.has(`${tool.server || 'unknown'}::${tool.name}`)
+    )
+    useAppState
+      .getState()
+      .setToolCostReport(
+        this.threadId ?? '',
+        summarizeToolCost(
+          modelSupportsTools ? sentTools : [],
+          readModelCtxLen(selectedModel)
+        )
+      )
   }
 
   /**
@@ -508,6 +640,116 @@ export class CustomChatTransport implements ChatTransport<UIMessage> {
    */
   setContinueFromContent(content: string) {
     this.continueFromContent = content
+  }
+
+  /** `chat_template_kwargs` of the last created model (reasoning on/off). */
+  private lastChatTemplateKwargs: Record<string, unknown> | undefined
+
+  /** Size of the last prepared prompt, for diagnostics / telemetry. */
+  lastPromptSize:
+    | {
+        promptTokens: number
+        toolTokens: number
+        ctxLen: number
+        measured: boolean
+      }
+    | undefined
+
+  /**
+   * Estimate (or, for llama.cpp, measure) the prompt and grow the model's
+   * context window once when it would not fit. Returns silently on any
+   * failure — the reactive error path in the thread route remains the
+   * safety net. Throws a context-limit error when the ladder is already at
+   * the model's maximum so the request is not sent into a window it cannot
+   * fit.
+   */
+  private async ensureContextFits(args: {
+    providerId: string
+    modelId: string
+    provider: ProviderObject | undefined
+    system: string | undefined
+    messages: ModelMessage[]
+    tools: Record<string, Tool> | undefined
+    maxOutputTokens: number | undefined
+    recreateModel: () => Promise<void>
+    abortSignal: AbortSignal | undefined
+  }): Promise<void> {
+    const selectedModel = useModelProvider.getState().selectedModel
+    if (!selectedModel || selectedModel.id !== args.modelId) return
+    if (!readAutoIncreaseCtx(selectedModel)) return
+    const ctxLen = readModelCtxLen(selectedModel)
+    if (!ctxLen || !this.serviceHub) return
+
+    const heuristic = estimatePromptTokensHeuristic({
+      system: args.system,
+      messages: args.messages,
+      tools: args.tools,
+    })
+    let promptTokens = heuristic
+    let measured = false
+    if (
+      args.providerId === 'llamacpp' ||
+      args.providerId === 'llamacpp-upstream'
+    ) {
+      const exact = await ModelFactory.countLocalPromptTokens(
+        args.providerId,
+        args.modelId,
+        args.provider,
+        {
+          messages: toOpenAiMessages({
+            system: args.system,
+            messages: args.messages,
+          }),
+          tools: toOpenAiTools(args.tools),
+          ...(this.lastChatTemplateKwargs
+            ? { chat_template_kwargs: this.lastChatTemplateKwargs }
+            : {}),
+        }
+      )
+      if (exact !== null) {
+        promptTokens = exact
+        measured = true
+      }
+    }
+    if (args.abortSignal?.aborted) return
+
+    const needed =
+      promptTokens + (args.maxOutputTokens ?? DEFAULT_OUTPUT_RESERVE_TOKENS)
+    const limit = ctxLen * PREFLIGHT_CTX_THRESHOLD
+    this.lastPromptSize = {
+      promptTokens,
+      toolTokens: estimateToolsTokens(args.tools),
+      ctxLen,
+      measured,
+    }
+    if (needed <= limit) return
+
+    const minCtxLen = Math.ceil(needed / PREFLIGHT_CTX_THRESHOLD)
+    console.info(
+      `[chat] prompt ${promptTokens} tokens (${measured ? 'measured' : 'estimated'}) + ${needed - promptTokens} reserved does not fit ctx ${ctxLen}; growing to >= ${minCtxLen}`
+    )
+    const result = await growModelContext({
+      providerId: args.providerId,
+      modelId: args.modelId,
+      serviceHub: this.serviceHub,
+      minCtxLen,
+    })
+    if (!result.ok) {
+      if (result.reason === 'at_max') {
+        throw new Error(
+          `${OUT_OF_CONTEXT_SIZE} The prompt needs about ${needed} tokens (${this.lastPromptSize.toolTokens} of them are tool definitions) but the model's maximum context is ${result.max ?? result.from}. Disable some connectors for this chat or shorten the conversation.`
+        )
+      }
+      if (result.reason === 'fit') {
+        throw new Error(
+          `${OUT_OF_CONTEXT_SIZE} The prompt needs about ${needed} tokens (${this.lastPromptSize.toolTokens} of them are tool definitions) but the context this device has room for is ${result.from}. Disable some connectors for this chat, shorten the conversation, or turn off "Fit to device memory" in the model settings to set the context by hand.`
+        )
+      }
+      return
+    }
+    if (args.abortSignal?.aborted) return
+    await args.recreateModel()
+    this.lastPromptSize = { ...this.lastPromptSize, ctxLen: result.to }
   }
 
   async sendMessages(
@@ -532,6 +774,9 @@ export class CustomChatTransport implements ChatTransport<UIMessage> {
     const providerId = useModelProvider.getState().selectedProvider
     const effectiveProviderName = providerId
     const provider = useModelProvider.getState().getProviderByName(providerId)
+    // Re-creates `this.model` against the provider store's current settings
+    // (used after a pre-flight context growth reloads the local session).
+    let recreateModel: (() => Promise<void>) | undefined
     if (this.serviceHub && modelId && provider) {
       try {
         const updatedProvider = useModelProvider
@@ -548,11 +793,7 @@ export class CustomChatTransport implements ChatTransport<UIMessage> {
         const inferenceParams = withUpstreamDflashSampling(
           providerId,
           providerSettings,
-          withRecommendedSampling(
-            modelId,
-            sampling.params,
-            sampling.overridden
-          )
+          withRecommendedSampling(modelId, sampling.params, sampling.overridden)
         )
 
         // Global "Disable reasoning" setting — best-effort: dispatch the
@@ -566,26 +807,27 @@ export class CustomChatTransport implements ChatTransport<UIMessage> {
         const { disableReasoning, reasoningBudget } =
           useGeneralSetting.getState()
         const reasoningOverride: Record<string, unknown> = {}
-        const reasoningBudgetTokens: Record<
-          typeof reasoningBudget,
-          number | undefined
-        > = {
-          off: 0,
-          low: 256,
-          medium: 1024,
-          high: 4096,
-          unlimited: undefined,
-        }
+        const reasoningControls =
+          useModelProvider.getState().selectedModel?.reasoning
         if (disableReasoning || reasoningBudget === 'off') {
           switch (effectiveProviderName) {
             case 'llamacpp':
             case 'llamacpp-upstream':
-            case 'mlx':
+            case 'mlx': {
+              // Some templates (e.g. Hunyuan 3) have no `enable_thinking` and
+              // skip thinking only through their own effort value.
+              const offValue = reasoningControls?.offValue
               reasoningOverride.chat_template_kwargs = {
                 enable_thinking: false,
+                ...(offValue ? { reasoning_effort: offValue } : {}),
               }
-              reasoningOverride.reasoning_budget = 0
+              if (offValue && effectiveProviderName === 'mlx') {
+                // mlx-vlm forwards only a top-level `reasoning_effort` to the
+                // template; its `chat_template_kwargs` reader ignores the key.
+                reasoningOverride.reasoning_effort = offValue
+              }
               break
+            }
             case 'anthropic':
               reasoningOverride.thinking = { type: 'disabled' }
               break
@@ -618,13 +860,18 @@ export class CustomChatTransport implements ChatTransport<UIMessage> {
               }
           }
         } else if (
-          (effectiveProviderName === 'llamacpp' ||
-            effectiveProviderName === 'llamacpp-upstream' ||
-            effectiveProviderName === 'mlx') &&
-          reasoningBudgetTokens[reasoningBudget] !== undefined
+          effectiveProviderName === 'llamacpp' ||
+          effectiveProviderName === 'llamacpp-upstream' ||
+          effectiveProviderName === 'mlx'
         ) {
-          reasoningOverride.reasoning_budget =
-            reasoningBudgetTokens[reasoningBudget]
+          Object.assign(
+            reasoningOverride,
+            buildReasoningRequestFields(
+              reasoningBudget,
+              effectiveProviderName,
+              reasoningControls
+            )
+          )
         }
         const effectiveReasoningOverride = withUpstreamDflashReasoningOverride(
           providerId,
@@ -655,6 +902,22 @@ export class CustomChatTransport implements ChatTransport<UIMessage> {
           audioInputParts.length > 0 ? audioInputParts : undefined
         )
         ttftMark('deltaEnd')
+        recreateModel = async () => {
+          const fresh =
+            useModelProvider.getState().getProviderByName(providerId) ??
+            effectiveProvider
+          this.model = await ModelFactory.createModel(
+            modelId,
+            fresh,
+            inferenceParams ?? {},
+            hasOverride ? effectiveReasoningOverride : undefined,
+            audioInputParts.length > 0 ? audioInputParts : undefined
+          )
+        }
+        this.lastChatTemplateKwargs =
+          effectiveReasoningOverride.chat_template_kwargs as
+            | Record<string, unknown>
+            | undefined
       } catch (error) {
         console.error('Failed to create model:', error)
         throw new Error(
@@ -670,10 +933,12 @@ export class CustomChatTransport implements ChatTransport<UIMessage> {
     // split it into separate messages so convertToModelMessages produces the
     // tool_use / tool_result pairing that the Claude API requires.
     // See: https://platform.claude.com/docs/en/agents-and-tools/tool-use/implement-tool-use#parallel-tool-use
+    // Mixed-engine hygiene: agent-run tool parts never reach a chat request.
+    const sanitizedMessages = stripAgentRunToolParts(options.messages)
     const messagesToConvert =
       effectiveProviderName === 'anthropic'
-        ? splitAnthropicSerialToolUse(options.messages)
-        : options.messages
+        ? splitAnthropicSerialToolUse(sanitizedMessages)
+        : sanitizedMessages
 
     // Convert UI messages to model messages. Non-image file parts are stripped
     // first — the converters accept `image/*` and nothing else. Order matters:
@@ -734,19 +999,44 @@ export class CustomChatTransport implements ChatTransport<UIMessage> {
     )
     const shouldEnableTools =
       hasTools && modelSupportsTools && !suppressToolsForDflash
+    const activeTools = !shouldEnableTools
+      ? undefined
+      : GRAMMAR_CONSTRAINED_PROVIDERS.has(effectiveProviderName)
+        ? withGrammarSafeToolSchemas(this.tools)
+        : this.tools
+
+    // Skills invoked on this thread (via the composer's "/" menu, stamped on
+    // user-message metadata) ride the system prompt — the chat counterpart of
+    // the agent's `skill.view` loading. Reading them off `options.messages`
+    // makes send, regenerate, edit and app-restart replay uniform.
+    const invokedSkillNames = collectSkillNamesFromMessages(options.messages)
+    const skillsBlock = renderChatSkillsBlock(
+      await loadChatSkillDetails(
+        invokedSkillNames,
+        this.skillDetailCache,
+        new Set([
+          ...useAppState.getState().mcpToolNames,
+          ...useAppState.getState().ragToolNames,
+        ])
+      )
+    )
+    const systemWithSkills = composeSystemMessage(
+      this.systemMessage,
+      skillsBlock
+    )
 
     const dropSystemForTools =
-      isLocalProvider && shouldEnableTools && !!this.systemMessage
+      isLocalProvider && shouldEnableTools && !!systemWithSkills
     const effectiveSystemMessage = dropSystemForTools
       ? undefined
-      : this.systemMessage
+      : systemWithSkills
 
     // When we drop the `system` field for the gemma+tools CoT workaround, fold
     // the instructions into the first user message so they still reach the
     // model instead of being silently lost.
     const finalModelMessages =
-      dropSystemForTools && this.systemMessage
-        ? foldSystemIntoFirstUserMessage(modelMessages, this.systemMessage)
+      dropSystemForTools && systemWithSkills
+        ? foldSystemIntoFirstUserMessage(modelMessages, systemWithSkills)
         : modelMessages
 
     // Track stream timing and token count for token speed calculation.
@@ -760,14 +1050,37 @@ export class CustomChatTransport implements ChatTransport<UIMessage> {
     const maxOutputTokens = getSamplingParamsForThread(this.threadId).params
       ?.max_output_tokens as number | undefined
 
+    // Pre-flight (local engines only): measure the rendered prompt — tool
+    // schemas included — and grow the context window BEFORE the request
+    // when it would not fit. Without this a long tool catalogue fails with
+    // "exceeds the available context size", the model is reloaded, and the
+    // whole prompt is regenerated; with it there is one reload and no error.
+    if (isLocalProvider && modelId) {
+      await this.ensureContextFits({
+        providerId: effectiveProviderName,
+        modelId,
+        provider,
+        system: effectiveSystemMessage,
+        messages: finalModelMessages,
+        tools: activeTools,
+        maxOutputTokens,
+        recreateModel,
+        abortSignal: options.abortSignal,
+      })
+    }
+
     const result = streamText({
       model: this.model,
       messages: finalModelMessages,
       abortSignal: options.abortSignal,
-      tools: shouldEnableTools ? this.tools : undefined,
+      tools: activeTools,
       toolChoice: shouldEnableTools ? 'auto' : undefined,
       system: effectiveSystemMessage,
       maxOutputTokens,
+      // Local engines answer a prompt that does not fit with a fast,
+      // deterministic error; retrying it (the SDK default for 5xx) only
+      // delays the context-growth path. Cloud providers keep the default.
+      maxRetries: isLocalProvider ? 0 : undefined,
       experimental_transform: stripSpecialTokensTransform,
       experimental_repairToolCall: async ({ toolCall, error }) => {
         if (NoSuchToolError.isInstance(error)) return null
@@ -823,18 +1136,12 @@ export class CustomChatTransport implements ChatTransport<UIMessage> {
           // the timer ever started AND we actually produced tokens (e.g. a
           // pure tool-call response yields 0 tokens and no delta, so the
           // fallback would otherwise divide by zero).
-          let tokenSpeed: number
-          if (tokensPerSecond > 0) {
-            tokenSpeed = tokensPerSecond
-          } else if (
-            streamStartTime !== undefined &&
-            durationSec > 0 &&
-            outputTokens > 0
-          ) {
-            tokenSpeed = outputTokens / durationSec
-          } else {
-            tokenSpeed = 0
-          }
+          const tokenSpeed = resolveTokenSpeed({
+            providerId,
+            providerReportedSpeed: tokensPerSecond,
+            outputTokens,
+            durationSec: streamStartTime === undefined ? 0 : durationSec,
+          })
 
           return {
             finishReason: finishPart.finishReason,
@@ -856,17 +1163,21 @@ export class CustomChatTransport implements ChatTransport<UIMessage> {
               totalTokens:
                 usage?.totalTokens ?? (inputTokens ?? 0) + outputTokens,
             },
-            tokenSpeed: {
-              tokenSpeed: Math.round(tokenSpeed * 10) / 10, // Round to 1 decimal
-              tokenCount: outputTokens,
-              durationMs,
-              ...(draftTokensTotal != null && draftTokensTotal > 0
-                ? {
-                    draftTokensTotal,
-                    draftTokensAccepted: draftTokensAccepted ?? 0,
-                  }
-                : {}),
-            },
+            ...(tokenSpeed > 0
+              ? {
+                  tokenSpeed: {
+                    tokenSpeed: Math.round(tokenSpeed * 10) / 10, // Round to 1 decimal
+                    tokenCount: outputTokens,
+                    durationMs,
+                    ...(draftTokensTotal != null && draftTokensTotal > 0
+                      ? {
+                          draftTokensTotal,
+                          draftTokensAccepted: draftTokensAccepted ?? 0,
+                        }
+                      : {}),
+                  },
+                }
+              : {}),
           }
         }
 

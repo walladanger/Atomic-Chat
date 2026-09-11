@@ -239,6 +239,37 @@ export const INTEGRATION_AGENTS: IntegrationAgent[] = [
     endpointWithPrefix: false,
   },
   {
+    id: 'muse',
+    name: 'Muse Code',
+    description: "Meta's multi-agent coding tool for your terminal.",
+    kind: 'coding',
+    detectBin: 'muse',
+    docsUrl: 'https://developer.meta.com/ai/products/muse-code/',
+    installable: true,
+    configurable: true,
+    requiresModel: true,
+    // `--base-url` replaces the Meta Model API root (`https://api.meta.ai/v1`),
+    // onto which Muse appends `/responses` itself -- the same Responses wire
+    // protocol Codex CLI speaks, which the local server already serves.
+    endpointWithPrefix: true,
+  },
+  {
+    id: 'atomic-agent',
+    name: 'Atomic Agent',
+    description:
+      'Local-first agent that browses, edits files, and runs commands.',
+    kind: 'assistant',
+    detectBin: 'atomic-agent',
+    docsUrl: 'https://github.com/AtomicBot-ai/atomic-agent',
+    installable: true,
+    configurable: true,
+    requiresModel: true,
+    // Atomic Agent stores an `openai-compatible` provider, whose `baseUrl` is
+    // the OpenAI API root. It normalises a trailing `/v1` away itself, but the
+    // stored value should still read as the base URL the user would paste.
+    endpointWithPrefix: true,
+  },
+  {
     id: 'hermes',
     name: 'Hermes Agent',
     description: 'Self-improving AI agent built by Nous Research.',

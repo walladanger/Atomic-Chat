@@ -99,6 +99,9 @@ vi.mock('@janhq/core', () => ({
   ModelEvent: {
     OnAutoIncreasedCtxLen: 'OnAutoIncreasedCtxLen',
   },
+  // Read at module load by `buildMlxConfig` / the ctx fallbacks, so a
+  // factory mock without it throws before any test runs.
+  DEFAULT_CTX_LEN: 16384,
   computeNextCtxLen: (current: number, max?: number) => {
     let next: number
     if (current < 8192) next = 8192
@@ -145,6 +148,32 @@ describe('llamacpp_extension auto_increase_ctx handler', () => {
       }
     ).handleAutoIncreaseCtx(payload)
   }
+
+  it('does nothing while fit is on: the engine sizes the context itself', async () => {
+    // `--ctx-size` is not emitted under fit, so a reload with a bigger value
+    // would be sized straight back down — a reload that changes nothing.
+    const unloadSpy = vi.spyOn(ext, 'unload').mockResolvedValue({ success: true })
+    const loadSpy = vi.spyOn(ext, 'load')
+    ;(ext as unknown as { config: Record<string, unknown> }).config = {
+      ctx_size: 8192,
+      fit: true,
+    }
+    ;(ext as any).modelCtxSize.set('m', 8192)
+
+    await invokeHandler({
+      request_id: 'req-fit',
+      backend: 'llamacpp',
+      model_id: 'm',
+      trigger: 'error',
+    })
+
+    expect(unloadSpy).not.toHaveBeenCalled()
+    expect(loadSpy).not.toHaveBeenCalled()
+    expect(emitMock).toHaveBeenCalledWith(
+      'local_backend://auto_increase_ctx_done/req-fit',
+      { ok: false, reason: 'fit' }
+    )
+  })
 
   it('grows 8192 → 32768 and emits done(ok:true) with new_ctx_len', async () => {
     const unloadSpy = vi

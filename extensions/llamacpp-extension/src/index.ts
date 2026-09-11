@@ -23,6 +23,9 @@ import {
   DownloadEvent,
   chatCompletionRequestMessage,
   computeNextCtxLen,
+  DEFAULT_CTX_LEN,
+  detectReasoningControls,
+  ReasoningControls,
   ModelEvent,
 } from '@janhq/core'
 
@@ -95,6 +98,7 @@ import {
   isCudaInstalledFromRust,
   copyBackendDlls,
 } from '../../../src-tauri/plugins/tauri-plugin-llamacpp/guest-js/index'
+import type { RuntimeDeviceInfo } from '../../../src-tauri/plugins/tauri-plugin-llamacpp/guest-js/types'
 
 // Error message constant - matches web-app/src/utils/error.ts
 const OUT_OF_CONTEXT_SIZE = 'the request exceeds the available context size.'
@@ -560,11 +564,12 @@ export default class llamacpp_extension extends AIEngine {
     // Migration v1: upgrade f16 KV cache defaults to q8_0
     await this.migrateKvCacheDefaults()
 
-    // Migration v2: upgrade KV cache defaults to turbo3 (turboquant)
-    await this.migrateKvCacheToTurbo3()
+    // The one-shot "migrate to turbo3" that lived here overwrote an explicit
+    // f16 / q8_0 choice as well as the default; turbo3 is the settings.json
+    // default and existing profiles have long since been moved (ATO-465).
 
-    // Migration v3: disable fit by default
-    await this.migrateFitDefault()
+    // Fit on by default; undo the migration that once forced it off.
+    await this.migrateFitDefaultOn()
 
     this.timeout = this.config.timeout
     this.llamacpp_env = this.config.llamacpp_env
@@ -687,57 +692,42 @@ export default class llamacpp_extension extends AIEngine {
     localStorage.setItem(MIGRATION_KEY, '1')
   }
 
-  private async migrateKvCacheToTurbo3(): Promise<void> {
-    const MIGRATION_KEY = 'llamacpp_kv_cache_migrated_turbo3_v2'
+
+  /**
+   * Fit is on by default (ATO-465). A one-shot migration used to force it
+   * OFF for everyone — including users who had turned it on — so a profile
+   * that went through it carries `fit: false` without anyone having chosen
+   * that. Undo it once, but only where nothing else about fit was touched:
+   * a non-default floor or target says the user configured fit on purpose,
+   * and their `false` stands.
+   */
+  private async migrateFitDefaultOn(): Promise<void> {
+    const MIGRATION_KEY = 'llamacpp_fit_enabled_v2'
+    const FORCED_OFF_KEY = 'llamacpp_fit_disabled_v1'
     if (localStorage.getItem(MIGRATION_KEY)) return
 
-    const keysToMigrate = ['cache_type_k', 'cache_type_v'] as const
-    const needsMigration = keysToMigrate.some(
-      (k) => this.config[k] !== 'turbo3'
-    )
+    const forcedOff = localStorage.getItem(FORCED_OFF_KEY) !== null
+    const fitCtx = String(this.config.fit_ctx ?? '').trim()
+    const fitTarget = String(this.config.fit_target ?? '').trim()
+    const untouched =
+      (fitCtx === '' || fitCtx === '4096') &&
+      (fitTarget === '' || fitTarget === '1024')
 
-    if (needsMigration) {
-      const settings = await this.getSettings()
-      await this.updateSettings(
-        settings.map((item) => {
-          if (
-            keysToMigrate.includes(
-              item.key as (typeof keysToMigrate)[number]
-            ) &&
-            item.controllerProps.value !== 'turbo3'
-          ) {
-            item.controllerProps.value = 'turbo3'
-          }
-          return item
-        })
-      )
-      for (const k of keysToMigrate) {
-        if (this.config[k] !== 'turbo3') this.config[k] = 'turbo3'
-      }
-      logger.info('Migrated KV cache types to turbo3')
-    }
-
-    localStorage.setItem(MIGRATION_KEY, '1')
-  }
-
-  private async migrateFitDefault(): Promise<void> {
-    const MIGRATION_KEY = 'llamacpp_fit_disabled_v1'
-    if (localStorage.getItem(MIGRATION_KEY)) return
-
-    if (this.config.fit === true) {
+    if (forcedOff && this.config.fit === false && untouched) {
       const settings = await this.getSettings()
       await this.updateSettings(
         settings.map((item) => {
           if (item.key === 'fit') {
-            item.controllerProps.value = false
+            item.controllerProps.value = true
           }
           return item
         })
       )
-      this.config.fit = false
-      logger.info('Migrated fit setting: disabled by default')
+      this.config.fit = true
+      logger.info('Re-enabled fit: it had been forced off by a migration')
     }
 
+    localStorage.removeItem(FORCED_OFF_KEY)
     localStorage.setItem(MIGRATION_KEY, '1')
   }
 
@@ -2134,6 +2124,27 @@ export default class llamacpp_extension extends AIEngine {
    * Returns the recommendation payload, or `null` when the device is already
    * on the optimal backend category (or detection couldn't decide).
    */
+  /**
+   * Why the last `recheckOptimalBackend()` returned null.
+   *
+   * The method returns `null` for four unrelated reasons — this is a Mac, CPU
+   * genuinely is the best this hardware can do, the optimal build is already
+   * installed, or the catalog has no entry for the detected type — and the
+   * return type cannot distinguish them. All four arrived in telemetry as the
+   * single value `no_recommendation`, so "46% of users who reach the Windows
+   * backend step get no recommendation" could not be read: `already_optimal`
+   * is a healthy outcome and is probably the most common of the four.
+   *
+   * Recorded rather than returned because the method has three callers and is
+   * not worth an API break for telemetry. Read via `getLastRecheckOutcome()`.
+   */
+  private lastRecheckOutcome: string | null = null
+
+  /** See `lastRecheckOutcome`. */
+  getLastRecheckOutcome(): string | null {
+    return this.lastRecheckOutcome
+  }
+
   async recheckOptimalBackend(): Promise<{
     currentBackend: string
     recommendedBackend: string
@@ -2143,8 +2154,10 @@ export default class llamacpp_extension extends AIEngine {
     backendId: string
   } | null> {
     if (IS_MAC) {
+      this.lastRecheckOutcome = 'mac'
       return null
     }
+    this.lastRecheckOutcome = null
     try {
       logger.info('recheckOptimalBackend: detecting ideal backend type')
       // An explicit user-driven check must see releases published since the
@@ -2159,6 +2172,7 @@ export default class llamacpp_extension extends AIEngine {
         )
         this.persistOptimalBackendCache(detection, currentBackend)
         localStorage.removeItem(TURBOQUANT_RECOMMENDATION_KEY)
+        this.lastRecheckOutcome = 'cpu_optimal'
         return null
       }
 
@@ -2177,6 +2191,7 @@ export default class llamacpp_extension extends AIEngine {
           currentType === idealType ? currentBackend : undefined
         )
         localStorage.removeItem(TURBOQUANT_RECOMMENDATION_KEY)
+        this.lastRecheckOutcome = 'already_optimal'
         return null
       }
 
@@ -2195,11 +2210,15 @@ export default class llamacpp_extension extends AIEngine {
         logger.warn(
           `recheckOptimalBackend: could not resolve a concrete tag for ${idealType} — skipping recommendation`
         )
+        // The catalog has nothing for the type detection picked — a gap on our
+        // side, not a property of the machine.
+        this.lastRecheckOutcome = 'no_catalog_entry'
         localStorage.removeItem(TURBOQUANT_RECOMMENDATION_KEY)
         return null
       }
 
       if (recommendedBackend === currentBackend) {
+        this.lastRecheckOutcome = 'already_optimal'
         localStorage.removeItem(TURBOQUANT_RECOMMENDATION_KEY)
         return null
       }
@@ -2229,6 +2248,7 @@ export default class llamacpp_extension extends AIEngine {
         throw err
       }
       logger.warn('recheckOptimalBackend failed:', err)
+      this.lastRecheckOutcome = 'threw'
       return null
     }
   }
@@ -3204,15 +3224,35 @@ export default class llamacpp_extension extends AIEngine {
       )
     }
 
+    // A Tauri command rejects with a bare string, so the step that failed and
+    // the path it failed on are both lost by the time the toast renders — which
+    // is why every import failure on Windows read "unknown error" and nothing
+    // reached the log (issue #256). Name each step on the way out.
+    const step = async <T>(what: string, run: () => Promise<T>): Promise<T> => {
+      try {
+        return await run()
+      } catch (error) {
+        const reason =
+          error instanceof Error ? error.message : String(error ?? 'unknown')
+        logger.error(`import(${modelId}): ${what} failed: ${reason}`)
+        throw new Error(`${what} failed: ${reason}`)
+      }
+    }
+
     // Calculate file sizes. A sharded model is the sum of its parts; quoting
     // only the first shard would advertise a 150 GB model as a few megabytes.
     let size_bytes = 0
     for (const shard of ggufShardSetPaths(fullModelPath)) {
-      size_bytes += (await fs.fileStat(shard)).size
+      size_bytes += (
+        await step(`reading ${shard}`, () => fs.fileStat(shard))
+      ).size
     }
     if (mmprojPath) {
+      const fullMmprojPath = await joinPath([janDataFolderPath, mmprojPath])
       size_bytes += (
-        await fs.fileStat(await joinPath([janDataFolderPath, mmprojPath]))
+        await step(`reading ${fullMmprojPath}`, () =>
+          fs.fileStat(fullMmprojPath)
+        )
       ).size
     }
 
@@ -3240,13 +3280,19 @@ export default class llamacpp_extension extends AIEngine {
       // LM Studio / Unsloth / HF cache). Persisted so the UI can label it.
       ...(importSource ? { source: importSource } : {}),
     } as ModelConfig
-    await fs.mkdir(await joinPath([janDataFolderPath, modelDir]))
-    await invoke<void>('write_yaml', {
-      data: modelConfig,
-      savePath: configPath,
-    })
+    const fullModelDir = await joinPath([janDataFolderPath, modelDir])
+    await step(`creating ${fullModelDir}`, () => fs.mkdir(fullModelDir))
+    await step(`writing ${configPath}`, () =>
+      invoke<void>('write_yaml', {
+        data: modelConfig,
+        savePath: configPath,
+      })
+    )
     events.emit(AppEvent.onModelImported, {
       modelId,
+      // Both llama.cpp providers list the same GGUF dir, so the web-app
+      // cannot tell from `modelId` alone which engine imported the file.
+      provider: this.provider,
       modelPath,
       mmprojPath,
       size_bytes,
@@ -4004,8 +4050,22 @@ export default class llamacpp_extension extends AIEngine {
     }
 
     try {
+      // With fit on, the context is what llama.cpp found room for at load.
+      // Reloading with a bigger `ctx_size` would be dropped by the argument
+      // builder (`--ctx-size` is not emitted under fit) and fit would size it
+      // again — a reload that changes nothing. The ladder is fit-off only.
+      if (this.config?.fit === true) {
+        await sendDone({ ok: false, reason: 'fit' })
+        logger.info(
+          `auto_increase_ctx: fit is on for ${model_id}; the engine sizes the context itself`
+        )
+        return
+      }
+
       const currentCtxLen =
-        this.modelCtxSize.get(model_id) ?? this.config?.ctx_size ?? 8192
+        this.modelCtxSize.get(model_id) ??
+        this.config?.ctx_size ??
+        DEFAULT_CTX_LEN
       const maxCtxLen = this.modelMaxCtxTrain.get(model_id)
       const newCtxLen = computeNextCtxLen(currentCtxLen, maxCtxLen)
 
@@ -4841,6 +4901,30 @@ export default class llamacpp_extension extends AIEngine {
     }
   }
 
+  /// Which device the loaded model actually ran on.
+  ///
+  /// Parsed from the llama-server startup log by the plugin and, until now,
+  /// used only to warn about a backend mismatch. The web-app needs it for
+  /// `model_load`: `n_gpu_layers` there is the requested value — the "offload
+  /// everything" sentinel on 98.3% of events — so how many layers reached the
+  /// GPU, and whether a CUDA build quietly ran on CPU, was recorded nowhere.
+  ///
+  /// Never throws: telemetry must not be able to break a load.
+  async getRuntimeDeviceInfo(
+    modelId: string
+  ): Promise<RuntimeDeviceInfo | null> {
+    try {
+      const sInfo = await this.findSessionByModel(modelId)
+      if (!sInfo) return null
+      // `load_tensors` normally precedes "listening on", but on a slow mmap
+      // the snapshot taken at readiness can still be empty — re-ask.
+      return sInfo.runtime_device ?? (await getRuntimeDevice(sInfo.pid))
+    } catch (e) {
+      logger.debug('getRuntimeDeviceInfo failed (continuing):', e)
+      return null
+    }
+  }
+
   private async findSessionByModel(modelId: string): Promise<SessionInfo> {
     try {
       let sInfo = await invoke<SessionInfo>(
@@ -5210,6 +5294,37 @@ export default class llamacpp_extension extends AIEngine {
   }
 
   /**
+   * Report the reasoning controls declared by the model's GGUF chat template.
+   * @param modelId
+   * @returns
+   */
+  async getReasoningControls(modelId: string): Promise<ReasoningControls> {
+    try {
+      const janDataFolderPath = await getJanDataFolderPath()
+      const modelConfigPath = await joinPath([
+        this.providerPath,
+        'models',
+        modelId,
+        'model.yml',
+      ])
+      const modelConfig = await invoke<ModelConfig>('read_yaml', {
+        path: modelConfigPath,
+      })
+      const modelPath = await joinPath([
+        janDataFolderPath,
+        modelConfig.model_path,
+      ])
+      const metadata = await readGgufMetadata(modelPath)
+      return detectReasoningControls(
+        metadata.metadata?.['tokenizer.chat_template']
+      )
+    } catch (e) {
+      logger.warn(`Failed to detect reasoning controls for ${modelId}: ${e}`)
+      return { supportsThinking: false }
+    }
+  }
+
+  /**
    * Check the support status of a model by its path (local/remote)
    *
    * Returns:
@@ -5222,7 +5337,14 @@ export default class llamacpp_extension extends AIEngine {
     ctxSize?: number
   ): Promise<'RED' | 'YELLOW' | 'GREEN'> {
     try {
-      const result = await isModelSupported(path, Number(ctxSize))
+      // The cache types this engine loads with: the estimate used to assume
+      // fp16 and went red on models a quantised cache fits comfortably.
+      const result = await isModelSupported(
+        path,
+        Number(ctxSize),
+        this.config.cache_type_k,
+        this.config.cache_type_v
+      )
       return result
     } catch (e) {
       throw new Error(String(e))

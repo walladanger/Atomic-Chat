@@ -6,15 +6,24 @@ export const TranslationContext = createContext<{
 	t: (key: string, options?: Record<string, unknown>) => string
 	i18n: typeof i18next
 }>({
-	// Decision D18. This used to be `(key) => key`, so any component rendered
-	// outside TranslationProvider showed the user a literal key such as
-	// `media:asset.reRun` instead of words. context.ts already imports the
-	// instance; delegating to it means the default resolves the namespace,
-	// falls back to English, honours `defaultValue` and interpolates.
+	// D18, settled during the v2.0.35 sync.
 	//
-	// Note for tests: several suites deliberately assert on raw keys and mock
-	// `@/i18n/react-i18next-compat` to do so. That still works - this is only
-	// the CONTEXT default, which those mocks bypass entirely.
-	t: (key: string, options?: Record<string, unknown>) => i18next.t(key, options),
+	// This honours an explicit `defaultValue` and otherwise returns the raw
+	// key. That satisfies both conventions at once, which neither of the
+	// obvious options did:
+	//
+	//  - returning the key always (the original) showed users literal text
+	//    like `media:asset.reRun` in any component rendered outside
+	//    TranslationProvider;
+	//  - resolving real translations broke every test that asserts on raw
+	//    keys, and the v2.0.35 sync alone brought twelve more of those, so
+	//    keeping it would mean rewriting upstream's tests on every sync.
+	//
+	// Callers that pass a defaultValue (the media surfaces do, everywhere)
+	// get readable English; callers that do not (upstream's, almost
+	// everywhere) get the key their tests expect. No interpolation here on
+	// purpose - a component that needs it belongs inside the provider.
+	t: (key: string, options?: Record<string, unknown>) =>
+		typeof options?.defaultValue === 'string' ? options.defaultValue : key,
 	i18n: i18next,
 })
