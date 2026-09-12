@@ -9,9 +9,9 @@ decision is reversed, add a new one that says which record it supersedes.
 2. Add one line to the right section of this index.
 3. Do **not** paste the record body into `AGENTS.md`.
 
-224 records, 2026-05-19 → 2026-09-10.
+245 records, 2026-05-19 → 2026-09-12.
 
-<!-- The count was 215 before the eight Radium Media records of 2026-09-10, but there were 216 files: a pre-existing off-by-one, corrected here rather than carried forward. Verified by counting *.md excluding INDEX and _TEMPLATE. -->
+<!-- Counted from the files on disk after the v2.0.35 upstream merge, not arithmetic on the two sides of the conflict. Verified by counting *.md excluding INDEX and _TEMPLATE. -->
 
 ---
 
@@ -49,8 +49,10 @@ library on disk, and how the frozen surface is allowed to change.
 - **2026-09-10** — [Store media provider credentials in the OS credential store, never in localStorage](2026-09-10-store-media-provider-credentials-in-the-os-credential-store.md)
 - **2026-09-10** — [Media models and providers come from `atomic-chat-conf`](2026-09-10-media-models-and-providers-come-from-atomic-chat-conf.md) — decision only; Task 15 deferred
 
-## Launch page & external coding agents (16)
+## Launch page & external coding agents (18)
 
+- **2026-09-01** — [Track OpenClaw 2026.8: detect the app-installed CLI, widen an existing `modelPolicy.allow`, and gate the npm/Node prerequisites](2026-09-01-track-openclaw-2026-8-detect-the-app-installed-cli-widen.md)
+- **2026-08-25** — [Add Atomic Agent as a one-click Launch-page assistant, configured by merging an `openai-compatible` provider into `~/.atomic-agent/config.json`](2026-08-25-add-atomic-agent-as-a-one-click-launch-page-assistant.md)
 - **2026-08-20** — [Narrow `atomic-chat-cli` to models / serve / launch / server status](2026-08-20-narrow-atomic-chat-cli-to-models-serve-launch-and-server-status.md)
 - **2026-08-18** — [Add DeepSeek Harness (`dsh`) as a one-click Launch-page coding agent, configured by merging a hand-declared `llm-pi-ai` route into `$DSH_HOME/settings.yaml`](2026-08-18-add-deepseek-harness-as-a-launch-page-coding-agent.md)
 - **2026-07-07** — [Fall back to the Local API Server's "Current Model" when configuring Launch-page agents against a cloud-provider selection](2026-07-07-fall-back-to-the-local-api-server-s-current-model-when.md)
@@ -68,8 +70,12 @@ library on disk, and how the frozen surface is allowed to change.
 - **2026-06-02** — [Add a `/v1/responses` translation shim to the local proxy so Codex CLI works on llama.cpp models](2026-06-02-add-a-v1-responses-translation-shim-to-the-local-proxy-so-codex.md)
 - **2026-06-01** — [Add a "Launch" page to install + configure external coding agents / assistants against the local OpenAI-compatible API](2026-06-01-add-a-launch-page-to-install-configure-external-coding-agents.md)
 
-## Agent mode — autonomous loop, tools, skills, workspace (40)
+## Agent mode — autonomous loop, tools, skills, workspace (44)
 
+- **2026-08-27** — [Give the agent native RAG tools over the existing vector collections](2026-08-27-native-agent-rag-tools.md)
+- **2026-08-27** — [Unify chat and agent on the agent engine](2026-08-27-unify-chat-and-agent-on-the-agent-engine.md)
+- **2026-08-18** — [Let Agent turns think, and apply the same thinking level chat uses](2026-08-18-let-agent-turns-think-and-apply-the-thinking-level.md)
+- **2026-08-18** — [Extend Agent mode to MLX and cloud tool providers](2026-08-18-extend-agent-mode-to-mlx-and-cloud-tool-providers.md)
 - **2026-07-31** — [Raise the Agent tool-step completion deadline to 600 seconds](2026-07-31-raise-agent-tool-step-completion-deadline-to-600-seconds.md)
 - **2026-07-27** — [Run Windows GAIA evaluation on the selected upstream GPU backend](2026-07-27-run-windows-gaia-evaluation-on-the-selected-upstream-gpu-backend.md)
 - **2026-07-27** — [Keep the GAIA evaluator out of desktop bundles](2026-07-27-keep-the-gaia-evaluator-out-of-desktop-bundles.md)
@@ -242,8 +248,9 @@ library on disk, and how the frozen surface is allowed to change.
 - **2026-06-10** — [Throttle crashloop `model_load` failure spam client-side; confirm `model_load.status` / api 404-noise are already-fixed-pending-rollout, not code bugs (ATO-130: ATO-133 + ATO-131 + ATO-132)](2026-06-10-throttle-crashloop-model-load-failure-spam-client-side-confirm.md)
 - **2026-06-09** — [Add zero-PII Sentry crash/error tracking to both the React frontend and the Rust/Tauri desktop, gated behind `productAnalytic` (ATO-113)](2026-06-09-add-zero-pii-sentry-crash-error-tracking-to-both-the-react.md)
 
-## Packaging, installers, autostart & platform policy (13)
-
+## Packaging, installers, autostart & platform policy (15)
+- **2026-09-12** — [Radium never auto-updates: remove the updater rather than repoint it](2026-09-12-radium-never-auto-updates.md)
+- **2026-09-04** — [Sanitize the AppImage environment before launching host processes](2026-09-04-sanitize-appimage-environment-before-launching-host-processes.md)
 - **2026-08-19** — [Leave launch at startup off for new installs](2026-08-19-leave-launch-at-startup-off-for-new-installs.md)
 - **2026-08-05** — [Default autostart on only for clean desktop installs](2026-08-05-default-autostart-on-only-for-clean-desktop-installs.md)
 - **2026-08-05** — [Keep launch at startup opt-in and ignore development binaries](2026-08-05-keep-launch-at-startup-opt-in-and-ignore-development-binaries.md)
@@ -258,12 +265,25 @@ library on disk, and how the frozen surface is allowed to change.
 - **2026-05-22** — [Pin static WiX `upgradeCode` to legacy Jan UUID for in-place MSI upgrades](2026-05-22-pin-static-wix-upgradecode-to-legacy-jan-uuid-for-in-place-msi.md)
 - **2026-05-19** — [Product identity is "Radium Chat"; new code stops carrying Jan branding](2026-05-19-product-identity-is-atomic-chat-new-code-stops-carrying-jan.md)
 
-## UI / UX (23)
+## UI / UX (33)
 
+- **2026-09-09** — [Resolve the reply model on send instead of asking (ATO-461)](2026-09-09-resolve-the-reply-model-on-send-instead-of-asking.md)
+- **2026-09-07** — [Answer a blocked send with a widget, not a red line (ATO-453)](2026-09-07-answer-a-blocked-send-with-a-widget-not-a-red-line.md)
+- **2026-09-04** — [Do not estimate ChatGPT subscription token speed](2026-09-04-do-not-estimate-chatgpt-subscription-token-speed.md)
+- **2026-09-04** — [Bound streaming reasoning render cost](2026-09-04-bound-streaming-reasoning-render-cost.md)
+- **2026-09-02** — [Switch single MCP tools per connector from a tools dialog; a connector's per-chat on/off lives there too](2026-09-02-switch-single-mcp-tools-per-connector-from-a-tools-dialog.md)
+- **2026-09-02** — [Measure and surface MCP tool cost in chat; never trim or hide schemas](2026-09-02-measure-and-surface-mcp-tool-cost-in-chat.md)
+- **2026-08-27** — [Connect a ChatGPT subscription as a model provider](2026-08-27-connect-a-chatgpt-subscription-as-a-model-provider.md)
+- **2026-08-27** — [Move cloud providers out of Settings into a Cloud page](2026-08-27-move-cloud-providers-into-a-cloud-page.md)
+- **2026-08-24** — [GAIA L1: media tools, PDF-from-URL, and web recovery fallbacks](2026-08-24-gaia-l1-media-tools-and-web-recovery.md)
+- **2026-08-24** — [GAIA L1: answer contract, reformulator, and harness sampling](2026-08-24-gaia-l1-answer-contract-and-harness.md)
+- **2026-08-24** — [Spill oversized observations to the workspace instead of compressing them](2026-08-24-spill-oversized-observations-instead-of-compressing-them.md)
+- **2026-08-24** — [Dictate into the composer with a local Voxtral model on `llamacpp-upstream`](2026-08-24-dictate-into-the-composer-with-a-local-voxtral-model.md)
 - **2026-08-21** — [Never list TurboQuant next to upstream llama.cpp](2026-08-21-never-list-turboquant-next-to-upstream-llama-cpp.md)
 - **2026-08-21** — [Keep attachments when a message is edited in a chat thread](2026-08-21-keep-attachments-when-a-message-is-edited-in-a-chat-thread.md)
 - **2026-08-21** — [Edit messages inline in the transcript instead of in a modal dialog](2026-08-21-edit-messages-inline-in-the-transcript-instead-of-a-modal.md)
 - **2026-08-19** — [Let onboarding connect a cloud provider](2026-08-19-let-onboarding-connect-a-cloud-provider.md)
+- **2026-08-14** — [Offer a thinking level only where the chat template declares one](2026-08-14-offer-a-thinking-level-only-where-the-chat-template-declares-one.md)
 - **2026-08-14** — [Show the streaming code while an HTML artifact generates](2026-08-14-show-the-streaming-code-while-an-html-artifact-generates.md)
 - **2026-08-14** — [Collapse the engine log behind a toggle in the model-load toast](2026-08-14-collapse-the-engine-log-behind-a-toggle-in-the-model-load-toast.md)
 - **2026-08-13** — [Move sampling back onto each assistant (per-assistant sampler, popover stays the only editor)](2026-08-13-move-sampling-back-onto-each-assistant.md)

@@ -14,9 +14,16 @@ const TAURI_ROOT = join(REPO_ROOT, 'src-tauri')
 const PLUGINS_ROOT = join(TAURI_ROOT, 'plugins')
 
 const EXPECTED_DESKTOP_ONLY = new Set([
-  'check_for_app_updates',
+  // ChatGPT subscription sign-in. Desktop only on purpose: the OAuth callback
+  // needs a loopback listener on a fixed port, and the refresh token needs a
+  // mode-0600 file. `PlatformFeature.CHATGPT_SUBSCRIPTION` gates the UI to
+  // match.
+  'chatgpt_cancel_login',
+  'chatgpt_login',
+  'chatgpt_logout',
+  'chatgpt_models',
+  'chatgpt_status',
   'get_local_http',
-  'is_update_available',
   // Radium Media provider credentials, in the OS credential store. Desktop
   // only on purpose: mobile has no media providers, and shipping a credential
   // surface it does not need would widen the attack surface for nothing.
@@ -34,6 +41,7 @@ const EXPECTED_DESKTOP_ONLY = new Set([
 ])
 const EXPECTED_MOBILE_ONLY = new Set(['abort_remote_stream'])
 const EXPECTED_PLUGIN_IDS = [
+  'atomic-audio',
   'foundation-models',
   'hardware',
   'llamacpp',

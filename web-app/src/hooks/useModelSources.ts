@@ -44,8 +44,9 @@ const adaptCatalog = (
     // OS-agnostic so the same cache works for a user who later moves to
     // macOS.
     if (is_mlx && !IS_MACOS) continue
-    // Hide companion GGUFs baked into the curated catalog — projectors,
-    // tokenizers and speculative heads are not standalone downloadable models.
+    // Hide the GGUFs the curated catalog carries that are not runnable weights
+    // (imatrix dumps, MTP/DFlash/EAGLE heads, vocab-only and audio-companion
+    // files) — they are part of a repo's file list, not downloadable models.
     const stripped = stripNonWeightQuants(entry)
     out.push({
       ...stripped,

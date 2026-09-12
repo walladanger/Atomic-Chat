@@ -142,9 +142,14 @@ export default defineConfig(({ mode }) => {
         env.VITE_MODEL_CATALOG_URL ||
           'https://raw.githubusercontent.com/AtomicBot-ai/atomic-chat-model-catalog/main/dist/catalog.json'
       ),
-      AUTO_UPDATER_DISABLED: JSON.stringify(
-        env.AUTO_UPDATER_DISABLED === 'true'
-      ),
+      // Hardcoded, not read from the environment: Radium never auto-updates.
+      // The endpoint the updater checked is upstream's, so accepting an update
+      // replaced this fork with Atomic Chat. There is deliberately no env var
+      // to switch this back on - the Tauri updater plugin, its endpoint and
+      // the Rust updater module have all been removed, so a `false` here would
+      // only produce a button that cannot work. See
+      // `docs/decisions/2026-09-12-radium-never-auto-updates.md`.
+      AUTO_UPDATER_DISABLED: JSON.stringify(true),
       FORCE_ONBOARDING: JSON.stringify(
         process.env.FORCE_ONBOARDING === 'true' ||
           env.FORCE_ONBOARDING === 'true'

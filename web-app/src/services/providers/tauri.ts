@@ -3,8 +3,13 @@
  */
 
 import { ensureRegistryLoaded } from '@/stores/provider-registry-store'
+import { DEFAULT_CTX_LEN } from '@janhq/core'
 import { providerModels } from '@/constants/models'
-import { EngineManager, SettingComponentProps } from '@janhq/core'
+import {
+  EngineManager,
+  ReasoningControls,
+  SettingComponentProps,
+} from '@janhq/core'
 import { ModelCapabilities } from '@/types/models'
 import { modelSettings } from '@/lib/predefined'
 import { ExtensionManager } from '@/lib/extension'
@@ -97,6 +102,12 @@ function extractModelIds(rawText: string, providerLabel: string): string[] {
   return Array.from(new Set(ids))
 }
 
+/** A context length worth keeping: a positive number, or a string of one. */
+const isUsableCtxLen = (value: unknown): boolean => {
+  const n = typeof value === 'string' ? parseInt(value, 10) : value
+  return typeof n === 'number' && Number.isFinite(n) && n > 0
+}
+
 export class TauriProvidersService extends DefaultProvidersService {
   fetch(): typeof fetch {
     // Tauri implementation uses Tauri's fetch to avoid CORS issues
@@ -187,15 +198,37 @@ export class TauriProvidersService extends DefaultProvidersService {
                 capabilities = [...capabilities, ModelCapabilities.EMBEDDINGS]
               }
 
+              // Which reasoning knobs the model's chat template understands.
+              // Drives the effort selector in the chat input.
+              let reasoning: ReasoningControls | undefined
+              if (!model.embedding) {
+                try {
+                  reasoning = await value.getReasoningControls(model.id)
+                } catch (error) {
+                  console.warn(
+                    `Failed to detect reasoning controls for model ${model.id}:`,
+                    error
+                  )
+                  // Continue without an effort selector if detection fails
+                }
+              }
+
               return {
                 id: model.id,
                 model: model.id,
                 name: model.name,
                 description: model.description,
                 capabilities,
+                reasoning,
                 embedding: model.embedding, // Preserve embedding flag for filtering in UI
-                // Origin of an imported model, for the UI badge.
+                // Origin of an imported model, for the UI badge — and for
+                // `model_load.import_source`, which is the only way to tell an
+                // imported model from a re-load of one downloaded earlier.
                 source: (model as { source?: Model['source'] }).source,
+                // On-disk size, summed across shards when the engine imported
+                // it. Dropped here until now, which is why `model_load` had no
+                // size at all and `size_bucket` existed only on downloads.
+                sizeBytes: (model as { sizeBytes?: number }).sizeBytes,
                 // Broken-link flag: keep out of auto-start, flag in the UI.
                 missing: (model as { missing?: boolean }).missing,
                 // Absolute weights path, for deduping scan candidates.
@@ -204,8 +237,12 @@ export class TauriProvidersService extends DefaultProvidersService {
                 settings: Object.values(modelSettings).reduce(
                   (acc, setting) => {
                     let value = setting.controller_props.value
-                    if (setting.key === 'ctx_len') {
-                      value = 16384 // Default context length for Llama.cpp models
+                    // A missing or unusable context length gets the default;
+                    // a value the user set is theirs. This used to overwrite
+                    // every model's `ctx_len` with 16384 on every load, so
+                    // the setting could be edited but never kept (ATO-465).
+                    if (setting.key === 'ctx_len' && !isUsableCtxLen(value)) {
+                      value = DEFAULT_CTX_LEN
                     }
                     acc[setting.key] = {
                       ...setting,

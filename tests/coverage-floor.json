@@ -6,10 +6,10 @@
     "lines": 65.6
   },
   "web-app/src/containers/SetupScreen.tsx": {
-    "statements": 34.44,
-    "branches": 63.63,
-    "functions": 22.22,
-    "lines": 34.44
+    "statements": 79.29,
+    "branches": 66.22,
+    "functions": 86.66,
+    "lines": 79.29
   },
   "web-app/src/containers/SetupBackendStep.tsx": {
     "statements": 3.21,
@@ -52,5 +52,11 @@
     "branches": 73.25,
     "functions": 59.37,
     "lines": 54.59
+  },
+  "web-app/src/lib/scanned-model-import.ts": {
+    "statements": 100,
+    "branches": 100,
+    "functions": 100,
+    "lines": 100
   }
 }

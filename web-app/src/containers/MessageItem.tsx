@@ -3,6 +3,7 @@ import {
   useState,
   useCallback,
   type ComponentPropsWithoutRef,
+  type UIEventHandler,
 } from 'react'
 import type { UIMessage, ChatStatus } from 'ai'
 import { RenderMarkdown } from './RenderMarkdown'
@@ -66,6 +67,7 @@ export type MessageItemProps = {
   status: ChatStatus
   requestActive?: boolean
   reasoningContainerRef?: React.RefObject<HTMLDivElement | null>
+  onReasoningScroll?: UIEventHandler<HTMLDivElement>
   onRegenerate?: (messageId: string) => void
   onEdit?: (messageId: string, newText: string) => void
   onDelete?: (messageId: string) => void
@@ -85,6 +87,7 @@ export const MessageItem = memo(
     isAnimating,
     hideActions,
     reasoningContainerRef,
+    onReasoningScroll,
     onRegenerate,
     onEdit,
     onDelete,
@@ -393,6 +396,7 @@ export const MessageItem = memo(
           <ReasoningTrigger getThinkingMessage={getThinkingMessage} />
           <div
             ref={streaming ? reasoningContainerRef : null}
+            onScroll={streaming ? onReasoningScroll : undefined}
             className={twMerge(
               'relative w-full overflow-auto',
               streaming
@@ -401,7 +405,9 @@ export const MessageItem = memo(
             )}
           >
             {block.items.map((item) => (
-              <ReasoningContent key={item.key}>{item.text}</ReasoningContent>
+              <ReasoningContent key={item.key} isStreaming={streaming}>
+                {item.text}
+              </ReasoningContent>
             ))}
           </div>
         </Reasoning>
@@ -423,6 +429,13 @@ export const MessageItem = memo(
       const durationSeconds = Number(
         Math.max(0.1, (block.durationMs ?? 100) / 1000).toFixed(1)
       )
+      // Loops and the error are rendered as children too, so they have to
+      // count towards `hasDetails` — a collapsible with no details drops its
+      // content entirely, which is how a run that failed before its first tool
+      // call used to show nothing but its duration.
+      const error = block.agentSummary?.error
+      const loopCount = block.agentSummary?.loops.length ?? 0
+      const hasDetails = toolCount > 0 || loopCount > 0 || Boolean(error)
 
       return (
         <AgentActivity
@@ -432,7 +445,10 @@ export const MessageItem = memo(
           durationLabel={t('activity.workedFor', {
             count: durationSeconds,
           })}
-          hasDetails={toolCount > 0}
+          hasDetails={hasDetails}
+          // A failed turn has no reply to read, so its reason should not be
+          // one click away.
+          defaultOpen={Boolean(error)}
         >
           {toolCount > 0 && (
             <ActivityDetail
@@ -461,10 +477,9 @@ export const MessageItem = memo(
               {loop.message}
             </div>
           ))}
-          {block.agentSummary?.error && (
+          {error && (
             <div className="py-1 text-xs text-destructive">
-              {block.agentSummary.error.category}:{' '}
-              {block.agentSummary.error.message}
+              {error.category}: {error.message}
             </div>
           )}
         </AgentActivity>
@@ -637,6 +652,7 @@ export const MessageItem = memo(
       prevProps.requestActive === nextProps.requestActive &&
       prevProps.showAssistant === nextProps.showAssistant &&
       prevProps.hideActions === nextProps.hideActions &&
+      prevProps.onReasoningScroll === nextProps.onReasoningScroll &&
       prevProps.agentAttachmentReferences ===
         nextProps.agentAttachmentReferences
     )

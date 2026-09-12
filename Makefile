@@ -102,13 +102,22 @@ dev-onboarding: install-and-build
 #   make dev-onboarding-low-spec ATOMIC_CHAT_CONF=~/work/atomic-chat-conf
 ATOMIC_CHAT_CONF ?= ../atomic-chat-conf
 
-# Онбординг глазами пользователя со слабой машиной: FORCE_HARDWARE_TIER=low
-# минует определение железа, и пикер показывает low-spec рекомендации (LFM)
-# на любом компьютере.
+# Ступень лестницы, под которую смотрим онбординг. Переопределяется:
+#   make dev-onboarding-low-spec FORCE_HARDWARE_TIER=unified_8
+FORCE_HARDWARE_TIER ?= vram_2
+
+# Онбординг глазами пользователя со слабой машиной: FORCE_HARDWARE_TIER
+# минует определение железа, и первый экран показывает рекомендацию заданной
+# ступени лестницы на любом компьютере.
 #
-# Манифест берём из локального чекаута conf, пока правка туда не влита: в
-# удалённом ещё нет `low_spec_recommendations`, а без него клиент штатно
-# откатывается на стандартную пару, и низкий тир было бы не увидеть.
+# Значение — любой id из `HardwareTier` (`web-app/src/lib/hardware-tier.ts`):
+# cpu_only, vram_2, vram_4, vram_8, vram_12, vram_16, vram_16_plus,
+# unified_8, unified_16, unified_32, unified_32_plus. Прежние `low` и
+# `standard` тоже принимаются и мапятся на ближайшую ступень.
+#
+# Манифест берём из локального чекаута conf, если он есть: ключа `tiers` в
+# удалённом может ещё не быть, но это не мешает — без него клиент штатно
+# берёт встроенную лестницу, которая и есть нужная рекомендация.
 dev-onboarding-low-spec: install-and-build
 	yarn download:bin
 	make download-llamacpp-backend
@@ -119,11 +128,11 @@ dev-onboarding-low-spec: install-and-build
 	@if [ -f "$(ATOMIC_CHAT_CONF)/models/recommended.json" ]; then \
 		cp "$(ATOMIC_CHAT_CONF)/models/recommended.json" web-app/public/dev-recommended.json; \
 		echo "[dev] манифест: $(ATOMIC_CHAT_CONF)/models/recommended.json"; \
-		FORCE_ONBOARDING=true FORCE_HARDWARE_TIER=low \
+		FORCE_ONBOARDING=true FORCE_HARDWARE_TIER=$(FORCE_HARDWARE_TIER) \
 			VITE_RECOMMENDED_MODELS_REGISTRY_URL=/dev-recommended.json yarn dev; \
 	else \
 		echo "[dev] $(ATOMIC_CHAT_CONF) не найден — манифест из сети (задайте ATOMIC_CHAT_CONF=...)"; \
-		FORCE_ONBOARDING=true FORCE_HARDWARE_TIER=low yarn dev; \
+		FORCE_ONBOARDING=true FORCE_HARDWARE_TIER=$(FORCE_HARDWARE_TIER) yarn dev; \
 	fi
 
 # ──────────────────────────────────────────────────────────────
@@ -319,7 +328,7 @@ lint: install-and-build
 .PHONY: test test-all test-local test-web test-extensions test-rust stub-resources app-icons \
 	test-selective-v2032 rebaseline-selective-v2032 stage-windows-backends verify-windows-backends \
 	typecheck verify-fast verify clippy-rust test-quality test-hardening-contracts \
-	test-coverage-critical capture-capabilities capture-hw-profile \
+	test-telemetry-props test-coverage-critical capture-capabilities capture-hw-profile \
 	sync-upstream-baseline gen-amd-rocm-pci-ids test-live test-live-cloud mutants
 
 test-web:
@@ -436,6 +445,7 @@ clippy-rust: stub-resources app-icons
 test-rust: export TAURI_CONFIG := {"bundle":{"icon":["icons/icon.png"]}}
 test-rust: stub-resources app-icons
 	cargo test --manifest-path src-tauri/Cargo.toml --no-default-features --features test-tauri -- --test-threads=1
+	cargo test --manifest-path src-tauri/plugins/tauri-plugin-atomic-audio/Cargo.toml
 	cargo test --manifest-path src-tauri/plugins/tauri-plugin-hardware/Cargo.toml
 	cargo test --manifest-path src-tauri/plugins/tauri-plugin-llamacpp/Cargo.toml
 	cargo test --manifest-path src-tauri/plugins/tauri-plugin-llamacpp-upstream/Cargo.toml -- --test-threads=1
@@ -458,6 +468,7 @@ test-hardening-contracts:
 	node --test tests/capabilities.test.mjs \
 		tests/registry-contracts.test.mjs \
 		tests/hardware-profiles.test.mjs \
+		tests/no-auto-update.test.mjs \
 		tests/upstream-backend-resolver.test.mjs
 
 test-coverage-critical:
@@ -474,9 +485,15 @@ test-coverage-critical:
 typecheck:
 	yarn workspace @janhq/web-app run tsc -b
 
+# Reserved PostHog property names. Cheap and independent of any build output,
+# so it runs before the suites that take minutes.
+test-telemetry-props:
+	node scripts/check-telemetry-props.mjs
+
 verify-fast:
 	yarn lint
 	"$(MAKE)" typecheck
+	"$(MAKE)" test-telemetry-props
 	"$(MAKE)" test-quality
 	"$(MAKE)" test-hardening-contracts
 	"$(MAKE)" test-coverage-critical
@@ -552,12 +569,15 @@ test-agent-model:
 	cargo test --manifest-path src-tauri/Cargo.toml -p Atomic-Chat \
 		managed_model_agent_scenarios -- --ignored --nocapture --test-threads=1
 
+GAIA_SKILLS_DIR ?= $(CURDIR)/src-tauri/resources/agent-skills
+
 .PHONY: gaia-eval
 gaia-eval:
 	@test -x "$(GAIA_LLAMA_SERVER)" || (echo "llama-server not found or not executable: $(GAIA_LLAMA_SERVER)" && exit 1)
 	@test -f "$(GAIA_MODEL)" || (echo "model not found: $(GAIA_MODEL)" && exit 1)
 	GAIA_LLAMA_SERVER="$(GAIA_LLAMA_SERVER)" \
 	GAIA_MODEL="$(GAIA_MODEL)" \
+	GAIA_SKILLS_DIR="$(GAIA_SKILLS_DIR)" \
 	cargo run --manifest-path src-tauri/Cargo.toml -p Atomic-Chat \
 		--features gaia-eval --example gaia-eval
 
@@ -593,7 +613,7 @@ test-all: install-and-build install-rust-targets
 # validation run; normal builds never resolve a moving latest release.
 # Example:
 #   make build-mlx-server MLXVLM_TAG=mlxvlm-macos-arm64-abc1234
-MLXVLM_TAG ?= mlxvlm-macos-arm64-89acca5
+MLXVLM_TAG ?= mlxvlm-macos-arm64-07ba5a1
 build-mlx-server:
 ifeq ($(shell uname -s),Darwin)
 	@mkdir -p src-tauri/resources/bin

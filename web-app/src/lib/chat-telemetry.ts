@@ -18,18 +18,19 @@
  * keep the call sites to a single unconditional call.
  */
 
-import posthog from 'posthog-js'
-
 import type { Attachment } from '@/types/attachment'
+import { queuedCapture } from '@/lib/telemetry-queue'
 import {
   attachmentExt,
   chatHttpStatus,
   ctxUsedBucket,
   ctxUsedPercent,
+  execBackendForModel,
   classifyChatFailure,
   finalizeChatTurnOnce,
   lengthBucket,
   loadBackendFromProvider,
+  normalizeModelId,
   shouldEmitChatFailure,
   sizeBucket,
   toolNameForAnalytics,
@@ -37,6 +38,14 @@ import {
 } from '@/lib/telemetry'
 
 export type ChatTurnSource = 'chat' | 'agent' | 'regenerate' | 'edit'
+
+/**
+ * Which pipeline actually served the turn. After the chat/agent merge the
+ * engine is a routing outcome, not a user choice — `route_reason` records why
+ * (see `RouteReason` in `lib/agent-route.ts`), so fallback traffic stays
+ * observable while the legacy pipeline is retired.
+ */
+export type ChatEngine = 'agent-ipc' | 'chat-transport'
 
 export type ChatOutcome =
   | 'success'
@@ -324,10 +333,62 @@ function compact(props: Record<string, unknown>): Record<string, unknown> {
   return out
 }
 
+/**
+ * Why a send never became a request.
+ *
+ * Only `no_model` is emitted today. The other early returns in the composer are
+ * either noise (an empty prompt is a stray Enter) or already visible elsewhere,
+ * and this event exists to size one specific wall.
+ */
+export type ChatBlockReason = 'no_model'
+
+const blockThrottle = new Map<ChatBlockReason, number>()
+const BLOCK_THROTTLE_MS = 60_000
+
+/**
+ * A user reached the chat, typed, pressed Enter, and got a hint instead of a
+ * response — because there is no model to answer with.
+ *
+ * This path emitted nothing at all: the composer returns before anything
+ * downstream captures a turn, so the single most common first-run dead end was
+ * invisible. Pairing it with what the user does next is the point.
+ *
+ * Throttled per reason: holding Enter must not turn one user into a spike.
+ */
+export function captureChatSendBlocked(props: {
+  reason: ChatBlockReason
+  thread_id?: string | null
+  is_agent_mode?: boolean
+  had_local_model_on_disk?: boolean
+  had_cloud_key?: boolean
+}): void {
+  try {
+    const now = Date.now()
+    const last = blockThrottle.get(props.reason)
+    if (last !== undefined && now - last < BLOCK_THROTTLE_MS) return
+    blockThrottle.set(props.reason, now)
+
+    const { reason, ...rest } = props
+    queuedCapture(
+      'chat_send_blocked',
+      compact({ ...rest, block_reason: reason })
+    )
+  } catch (err) {
+    console.debug('chat_send_blocked telemetry failed:', err)
+  }
+}
+
+/** Test seam — the throttle is module state and outlives a single test. */
+export function resetChatSendBlockThrottleForTests(): void {
+  blockThrottle.clear()
+}
+
 export type ChatRequestProps = {
   turn_id: string
   thread_id: string
   source: ChatTurnSource
+  engine?: ChatEngine
+  route_reason?: string
   model_id?: string | null
   provider?: string | null
   turn_index?: number
@@ -335,16 +396,23 @@ export type ChatRequestProps = {
   is_agent_mode?: boolean
   agent_skill?: string | null
   tools_enabled_count?: number
+  /** Estimated token cost of the tool definitions actually sent. */
+  tools_tokens_estimate?: number | null
+  /** That cost as a fraction of the configured context window. */
+  tools_ctx_share?: number | null
+  /** How many MCP servers contribute an outsized share of that cost. */
+  tools_heavy_servers?: number
 } & Partial<AttachmentTelemetry> &
   Partial<ContextTelemetry> &
   Partial<Pick<ToolTelemetry, 'has_rag' | 'has_mcp'>>
 
 export function captureChatRequest(props: ChatRequestProps): void {
   try {
-    posthog.capture(
+    queuedCapture(
       'chat_request_sent',
       compact({
         ...props,
+        model_id: normalizeModelId(props.model_id),
         has_attachments: (props.attachment_count ?? 0) > 0,
         backend: loadBackendFromProvider(props.provider),
       })
@@ -358,6 +426,8 @@ export type ChatResponseProps = {
   turn_id: string
   thread_id: string
   source: ChatTurnSource
+  engine?: ChatEngine
+  route_reason?: string
   outcome: ChatOutcome
   finish_reason?: string | null
   error?: unknown
@@ -409,10 +479,16 @@ export function captureChatResponse(props: ChatResponseProps): void {
     )
       return
 
-    posthog.capture(
+    queuedCapture(
       'chat_response_received',
       compact({
         ...rest,
+        model_id: normalizeModelId(props.model_id),
+        // What computed the answer. Null for remote providers — the whole
+        // reason `active_backend`, a device-level super-property, could not be
+        // used for this: it rode along on Pollinations and OpenAI responses
+        // too, and inverted the CPU-versus-GPU comparison.
+        exec_backend: execBackendForModel(props.model_id, props.provider),
         error_kind: errorKind ?? null,
         http_status: errorKind !== undefined ? chatHttpStatus(error) : null,
         backend: loadBackendFromProvider(props.provider),

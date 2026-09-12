@@ -22,6 +22,7 @@ import { DefaultModelsService } from './models/default'
 import { DefaultAssistantsService } from './assistants/default'
 import { DefaultDialogService } from './dialog/default'
 import { DefaultOpenerService } from './opener/default'
+import { DefaultAuthService } from './auth/default'
 import { DefaultUpdaterService } from './updater/default'
 import { DefaultPathService } from './path/default'
 import { DefaultCoreService } from './core/default'
@@ -29,6 +30,8 @@ import { DefaultDeepLinkService } from './deeplink/default'
 import { DefaultProjectsService } from './projects/default'
 import { DefaultRAGService } from './rag/default'
 import type { RAGService } from './rag/types'
+import { DefaultVoiceService } from './voice/default'
+import type { VoiceService } from './voice/types'
 import { DefaultUploadsService } from './uploads/default'
 import type { UploadsService } from './uploads/types'
 
@@ -47,6 +50,7 @@ import type { ModelsService } from './models/types'
 import type { AssistantsService } from './assistants/types'
 import type { DialogService } from './dialog/types'
 import type { OpenerService } from './opener/types'
+import type { AuthService } from './auth/types'
 import type { UpdaterService } from './updater/types'
 import type { PathService } from './path/types'
 import type { CoreService } from './core/types'
@@ -69,6 +73,7 @@ export interface ServiceHub {
   assistants(): AssistantsService
   dialog(): DialogService
   opener(): OpenerService
+  auth(): AuthService
   updater(): UpdaterService
   path(): PathService
   core(): CoreService
@@ -76,6 +81,7 @@ export interface ServiceHub {
   projects(): ProjectsService
   rag(): RAGService
   uploads(): UploadsService
+  voice(): VoiceService
 }
 
 class PlatformServiceHub implements ServiceHub {
@@ -93,6 +99,17 @@ class PlatformServiceHub implements ServiceHub {
   private assistantsService: AssistantsService = new DefaultAssistantsService()
   private dialogService: DialogService = new DefaultDialogService()
   private openerService: OpenerService = new DefaultOpenerService()
+  private authService: AuthService = new DefaultAuthService()
+  /**
+   * Permanently the no-op implementation, on every platform.
+   *
+   * The desktop build used to swap in a Tauri-backed one here. Radium
+   * does not auto-update: the endpoint it checked belongs to upstream, so
+   * accepting an update replaced this fork with Atomic Chat. The Tauri
+   * updater plugin, its endpoint and the whole Rust updater module are gone;
+   * this seam stays only so callers keep compiling, and it never reaches the
+   * network. See `docs/decisions/2026-09-12-radium-never-auto-updates.md`.
+   */
   private updaterService: UpdaterService = new DefaultUpdaterService()
   private pathService: PathService = new DefaultPathService()
   private coreService: CoreService = new DefaultCoreService()
@@ -100,6 +117,7 @@ class PlatformServiceHub implements ServiceHub {
   private projectsService: ProjectsService = new DefaultProjectsService()
   private ragService: RAGService = new DefaultRAGService()
   private uploadsService: UploadsService = new DefaultUploadsService()
+  private voiceService: VoiceService = new DefaultVoiceService()
   private initialized = false
 
   /**
@@ -128,10 +146,11 @@ class PlatformServiceHub implements ServiceHub {
           providersModule,
           dialogModule,
           openerModule,
-          updaterModule,
+          authModule,
           pathModule,
           coreModule,
           deepLinkModule,
+          voiceModule,
         ] = await Promise.all([
           import('./theme/tauri'),
           import('./window/tauri'),
@@ -142,10 +161,11 @@ class PlatformServiceHub implements ServiceHub {
           import('./providers/tauri'),
           import('./dialog/tauri'),
           import('./opener/tauri'),
-          import('./updater/tauri'),
+          import('./auth/tauri'),
           import('./path/tauri'),
           import('./core/tauri'),
           import('./deeplink/tauri'),
+          import('./voice/tauri'),
         ])
 
         this.themeService = new themeModule.TauriThemeService()
@@ -157,10 +177,11 @@ class PlatformServiceHub implements ServiceHub {
         this.providersService = new providersModule.TauriProvidersService()
         this.dialogService = new dialogModule.TauriDialogService()
         this.openerService = new openerModule.TauriOpenerService()
-        this.updaterService = new updaterModule.TauriUpdaterService()
+        this.authService = new authModule.TauriAuthService()
         this.pathService = new pathModule.TauriPathService()
         this.coreService = new coreModule.TauriCoreService()
         this.deepLinkService = new deepLinkModule.TauriDeepLinkService()
+        this.voiceService = new voiceModule.TauriVoiceService()
       } else if (isPlatformIOS() || isPlatformAndroid()) {
         const [
           themeModule,
@@ -289,6 +310,10 @@ class PlatformServiceHub implements ServiceHub {
     return this.openerService
   }
 
+  auth(): AuthService {
+    return this.authService
+  }
+
   updater(): UpdaterService {
     this.ensureInitialized()
     return this.updaterService
@@ -322,6 +347,11 @@ class PlatformServiceHub implements ServiceHub {
   uploads(): UploadsService {
     this.ensureInitialized()
     return this.uploadsService
+  }
+
+  voice(): VoiceService {
+    this.ensureInitialized()
+    return this.voiceService
   }
 }
 

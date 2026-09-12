@@ -5,10 +5,13 @@ import {
   useEffect,
   useMemo,
   useRef,
+  type ComponentType,
+  type MemoExoticComponent,
   type ReactNode,
 } from 'react'
 import { cn, disableIndentedCodeBlockPlugin } from '@/lib/utils'
 import { ttftEnabled, ttftMark, ttftReport } from '@/lib/ttft-timing'
+import { resolveCodeBlockFileName } from '@/lib/codeBlockFilename'
 // import 'katex/dist/katex.min.css'
 import {
   defaultRehypePlugins,
@@ -102,6 +105,44 @@ function extractCodeText(children: ReactNode): string {
     return (children.props as { children: string }).children
   }
   return ''
+}
+
+const REACT_MEMO_TYPE = Symbol.for('react.memo')
+
+function isMemoComponent(
+  type: unknown
+): type is MemoExoticComponent<ComponentType<Record<string, unknown>>> {
+  return (
+    typeof type === 'object' &&
+    type !== null &&
+    (type as { $$typeof?: symbol }).$$typeof === REACT_MEMO_TYPE
+  )
+}
+
+/**
+ * `pre` for the nested renderer that delegates code blocks back to streamdown.
+ *
+ * streamdown 2.1.1 memoises its `code` renderer on the hast node's start/end
+ * line and column. The nested renderer always receives a closed fence, so a
+ * final line that is still growing keeps the exact same position and the
+ * block never re-renders: it froze at the first token of its last line, and
+ * the copy button inside that subtree copied the stale text (#263). A new
+ * line moves `end.line`, which is why every line but the last was intact.
+ *
+ * streamdown's own `pre` just returns its child — the memoised `code`
+ * element — so render that element's inner component directly and the
+ * position comparator is never consulted. The `Block` memo one level up still
+ * skips unchanged content. Falls back to the child untouched if it isn't a
+ * memo element. Delete once the app moves to upstream streamdown ≥ 2.6, whose
+ * comparator already accounts for this.
+ */
+const UnmemoizedCodePre: Components['pre'] = ({ children }) => {
+  const child = Array.isArray(children)
+    ? children.find(isValidElement)
+    : children
+  if (!isValidElement(child) || !isMemoComponent(child.type)) return children
+  const Inner = child.type.type
+  return <Inner {...(child.props as Record<string, unknown>)} />
 }
 
 // Cache for normalized LaTeX content
@@ -214,6 +255,11 @@ function RenderMarkdownComponent({
 
   // Props for the nested renderer that delegates non-HTML code blocks back to
   // streamdown so mermaid / syntax highlighting behave exactly as before.
+  // Memoised so streamdown's `Block` sees one stable `components` identity.
+  const delegateComponents = useMemo<Components>(
+    () => ({ ...(components ?? {}), pre: UnmemoizedCodePre }),
+    [components]
+  )
   const delegateProps = useMemo(
     () => ({
       animate: false as const,
@@ -223,9 +269,9 @@ function RenderMarkdownComponent({
       plugins: STREAMDOWN_PLUGINS,
       controls: STREAMDOWN_CONTROLS,
       mermaid: mermaidConfig,
-      components,
+      components: delegateComponents,
     }),
-    [components, mermaidConfig]
+    [delegateComponents, mermaidConfig]
   )
 
   const mergedComponents = useMemo<Components | undefined>(() => {
@@ -271,9 +317,24 @@ function RenderMarkdownComponent({
       }
 
       // Delegate every other code block (incl. mermaid) to streamdown.
+      //
+      // The fence is rebuilt from the language alone, which drops the info
+      // string — and with it the filename the model gave the file. Recover it
+      // from the hast node before delegating and publish it on a wrapper, so
+      // the download handler can save `styles.css` instead of `file.css`
+      // (issue #255).
+      const fileName = resolveCodeBlockFileName({
+        meta: (node?.data as { meta?: string } | undefined)?.meta,
+        code: codeText,
+        language,
+      })
       const fence = makeFence(codeText)
       const reconstructed = `${fence}${match?.[1] ?? ''}\n${codeText}\n${fence}`
-      return <Streamdown {...delegateProps}>{reconstructed}</Streamdown>
+      return (
+        <div data-code-filename={fileName ?? undefined}>
+          <Streamdown {...delegateProps}>{reconstructed}</Streamdown>
+        </div>
+      )
     }
 
     return { code: CodeRenderer, ...(components ?? {}) }

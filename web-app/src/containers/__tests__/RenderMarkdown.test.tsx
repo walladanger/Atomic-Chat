@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react'
+import { fireEvent, render, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 import { RenderMarkdown } from '../RenderMarkdown'
 
@@ -248,6 +248,51 @@ describe('RenderMarkdown', () => {
     expect(codeBlock).toBeTruthy()
   })
 
+  it('carries the filename from the fence info string to the DOM', async () => {
+    const content = [
+      'Here is the stylesheet.',
+      '',
+      '```css title="styles.css"',
+      'body { color: red; }',
+      '```',
+      '',
+    ].join('\n')
+
+    const { container, findByText } = render(
+      <RenderMarkdown content={content} enableHtmlPreview />
+    )
+    await findByText('body', { exact: false })
+    expect(
+      container.querySelector('[data-code-filename="styles.css"]')
+    ).toBeTruthy()
+  })
+
+  it('carries the filename from a leading comment when the fence has none', async () => {
+    const content =
+      ['```js', '// js/main.js', 'const a = 1', '```'].join('\n') + '\n'
+
+    const { container, findByText } = render(
+      <RenderMarkdown content={content} enableHtmlPreview />
+    )
+    await findByText('const', { exact: false })
+    expect(
+      container.querySelector('[data-code-filename="js/main.js"]')
+    ).toBeTruthy()
+  })
+
+  it('leaves the filename unset when nothing names the file', async () => {
+    const content =
+      ['```css', 'body { color: red; }', '```'].join('\n') + '\n'
+
+    const { container, findByText } = render(
+      <RenderMarkdown content={content} enableHtmlPreview />
+    )
+    await findByText('body', { exact: false })
+    // The block must actually be a code block, or the assertion below is vacuous.
+    expect(container.querySelector('[data-streamdown="code-block"]')).toBeTruthy()
+    expect(container.querySelector('[data-code-filename]')).toBeNull()
+  })
+
   it('formats fenced code blocks without lang spec correctly', async () => {
     const contentWithFencedCodeBlock = `Please explain this code block.
 
@@ -366,5 +411,56 @@ describe('RenderMarkdown', () => {
       expect(katexContainer).toBeNull()
     })
   })
-})
+  describe('streaming code blocks under enableHtmlPreview (#263)', () => {
+    const bodyText = (container: HTMLElement) =>
+      container.querySelector('[data-streamdown="code-block-body"]')
+        ?.textContent ?? ''
 
+    it('re-renders a delegated code block when only its last line grows', async () => {
+      const { container, rerender } = render(
+        <RenderMarkdown content={'```js\nconst first = 100\nconst value = 1'} enableHtmlPreview isStreaming />
+      )
+      await waitFor(() => expect(bodyText(container)).toContain('const value = 1'))
+
+      // Same start/end line+column for the rebuilt closed fence: only the
+      // last line grew, which is exactly what the position memo ignored.
+      rerender(
+        <RenderMarkdown content={'```js\nconst first = 100\nconst value = 12'} enableHtmlPreview isStreaming />
+      )
+      await waitFor(() => expect(bodyText(container)).toContain('const value = 12'))
+
+      // Same-length replacement — the case upstream streamdown documents.
+      rerender(
+        <RenderMarkdown content={'```js\nconst first = 100\nconst value = 34'} enableHtmlPreview isStreaming />
+      )
+      await waitFor(() => expect(bodyText(container)).toContain('const value = 34'))
+    })
+
+    it('copies the latest text once the stream has finished', async () => {
+      const { container, rerender } = render(
+        <RenderMarkdown content={'```\n{AAAAAAAA}\n{BBBB},{BBBB}\n{CCC},{CCCCC}\n('} enableHtmlPreview isStreaming />
+      )
+      await waitFor(() => expect(bodyText(container)).toContain('('))
+
+      rerender(
+        <RenderMarkdown content={'```\n{AAAAAAAA}\n{BBBB},{BBBB}\n{CCC},{CCCCC}\n(DDDDDDDD)\n```\n'} enableHtmlPreview />
+      )
+      await waitFor(() => expect(bodyText(container)).toContain('(DDDDDDDD)'))
+
+      const copyButton = container.querySelector(
+        '[data-streamdown="code-block-copy-button"]'
+      )
+      expect(copyButton).toBeTruthy()
+      fireEvent.click(copyButton as Element)
+      await waitFor(() =>
+        // streamdown hands the copy button the fence body, trailing newline
+        // included; what matters is that the last line is no longer `(`.
+        expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+          expect.stringMatching(
+            /^\{AAAAAAAA\}\n\{BBBB\},\{BBBB\}\n\{CCC\},\{CCCCC\}\n\(DDDDDDDD\)\n*$/
+          )
+        )
+      )
+    })
+  })
+})

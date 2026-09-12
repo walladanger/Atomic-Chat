@@ -5,7 +5,6 @@ import DialogAppUpdater from '@/containers/dialogs/AppUpdater'
 import BackendUpdater from '@/containers/dialogs/BackendUpdater'
 import SuboptimalBackendDialog from '@/containers/dialogs/SuboptimalBackendDialog'
 import { Fragment } from 'react/jsx-runtime'
-import type { ReactNode } from 'react'
 import { ThemeProvider } from '@/providers/ThemeProvider'
 import { InterfaceProvider } from '@/providers/InterfaceProvider'
 import { KeyboardShortcutsProvider } from '@/providers/KeyboardShortcuts'
@@ -17,14 +16,15 @@ import { ToasterProvider } from '@/providers/ToasterProvider'
 // import { PromptAnalytic } from '@/containers/analytics/PromptAnalytic'
 import { useOnboardingModelReminder } from '@/hooks/useOnboardingModelReminder'
 import { PromptOnboardingModel } from '@/containers/PromptOnboardingModel'
+import { DownloadManagement } from '@/containers/DownloadManegement'
 import { AnalyticProvider } from '@/providers/AnalyticProvider'
 import { useLeftPanel } from '@/hooks/useLeftPanel'
 import { useTrayStatusSync } from '@/hooks/useTrayStatusSync'
 import ToolApproval from '@/containers/dialogs/ToolApproval'
 import AgentApprovalDialog from '@/containers/dialogs/AgentApprovalDialog'
 import AgentFolderAccessDialog from '@/containers/dialogs/AgentFolderAccessDialog'
+import VoiceSetupDialog from '@/containers/dialogs/VoiceSetupDialog'
 import { TranslationProvider } from '@/i18n/TranslationContext'
-import OutOfContextPromiseModal from '@/containers/dialogs/OutOfContextDialog'
 import AttachmentIngestionDialog from '@/containers/dialogs/AttachmentIngestionDialog'
 import WhatsNewDialog from '@/containers/dialogs/WhatsNewDialog'
 import { useEffect } from 'react'
@@ -36,8 +36,6 @@ import { StartupBackendCoordinator } from '@/providers/StartupBackendCoordinator
 import { ServiceHubProvider } from '@/providers/ServiceHubProvider'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { LeftSidebar } from '@/components/left-sidebar'
-import { WindowControls } from '@/components/WindowControls'
-import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 
 export const Route = createRootRoute({
   component: RootLayout,
@@ -49,41 +47,6 @@ export const Route = createRootRoute({
     return <GlobalError error={error} />
   },
 })
-
-function isWindowsMainWindow(): boolean {
-  return Boolean(
-    IS_TAURI &&
-      IS_WINDOWS &&
-      getCurrentWebviewWindow().label === 'main'
-  )
-}
-
-function WindowFrame({ children }: { children: ReactNode }) {
-  const customChrome = isWindowsMainWindow()
-
-  return (
-    <div className="relative size-full overflow-hidden bg-neutral-50 dark:bg-background">
-      {customChrome && (
-        <div className="absolute inset-x-0 top-0 z-[60] h-10 border-b border-border/50 bg-background/95 backdrop-blur">
-          <div
-            className="absolute inset-0 right-[132px]"
-            data-tauri-drag-region
-          />
-          <div
-            className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-[11px] font-medium text-muted-foreground"
-            data-tauri-drag-region
-          >
-            Radium Chat
-          </div>
-          <WindowControls />
-        </div>
-      )}
-      <div className={customChrome ? 'size-full pt-10' : 'size-full'}>
-        {children}
-      </div>
-    </div>
-  )
-}
 
 const AppLayout = () => {
   const { showOnboardingModelReminder } = useOnboardingModelReminder()
@@ -97,55 +60,58 @@ const AppLayout = () => {
   const isSetupCompleted = useSetupCompleted()
 
   return (
-    <WindowFrame>
-      <div className="bg-neutral-50 dark:bg-background size-full relative">
-        <SidebarProvider
-          open={isLeftPanelOpen}
-          onOpenChange={setLeftPanel}
-          defaultWidth={sidebarWidth}
-          onWidthChange={setLeftPanelWidth}
-        >
-          <AnalyticProvider />
-          <KeyboardShortcutsProvider />
-          <DialogAppUpdater />
-          {isSetupCompleted && <BackendUpdater />}
-          {/* Unlike the recommendation dialogs above, this dialog only opens
-              after ChatInput dispatches a mismatch prompt. Keep it mounted for
-              upgraded/legacy users whose setup-completed flag is absent. */}
-          <SuboptimalBackendDialog />
-          <WhatsNewDialog />
-          <LeftSidebar />
-          <SidebarInset>
-            <div className="bg-neutral-50 dark:bg-background size-full">
-              <Outlet />
-            </div>
-          </SidebarInset>
+    <div className="bg-neutral-50 dark:bg-background size-full relative">
+      <SidebarProvider
+        open={isLeftPanelOpen}
+        onOpenChange={setLeftPanel}
+        defaultWidth={sidebarWidth}
+        onWidthChange={setLeftPanelWidth}
+      >
+        <AnalyticProvider />
+        <KeyboardShortcutsProvider />
+        <DialogAppUpdater />
+        {isSetupCompleted && <BackendUpdater />}
+        {/* Unlike the recommendation dialogs above, this dialog only opens
+            after ChatInput dispatches a mismatch prompt. Keep it mounted for
+            upgraded/legacy users whose setup-completed flag is absent. */}
+        <SuboptimalBackendDialog />
+        <WhatsNewDialog />
+        <LeftSidebar />
+        <SidebarInset>
+          <div className="bg-neutral-50 dark:bg-background size-full">
+            <Outlet />
+          </div>
+        </SidebarInset>
 
-          {/* Попап согласия на аналитику отключён; настройки → Privacy по-прежнему доступны */}
-          {/* {productAnalyticPrompt && <PromptAnalytic />} */}
-          {showOnboardingModelReminder && <PromptOnboardingModel />}
-        </SidebarProvider>
-      </div>
-    </WindowFrame>
+        {/* Попап согласия на аналитику отключён; настройки → Privacy по-прежнему доступны */}
+        {/* {productAnalyticPrompt && <PromptAnalytic />} */}
+        {showOnboardingModelReminder && <PromptOnboardingModel />}
+        {/* ATO-462: mounted once at the root, not inside the sidebar or the
+            header. It used to render in one of two places depending on whether
+            the left panel was open, so a download's progress moved around the
+            screen — or vanished — as the user toggled the sidebar. This is also
+            the component that registers the download event listeners, so a
+            single mount keeps them registered exactly once. */}
+        <DownloadManagement />
+      </SidebarProvider>
+    </div>
   )
 }
 
 const LogsLayout = () => {
   return (
-    <WindowFrame>
-      <Fragment>
-        <main className="relative h-full text-sm antialiased select-text bg-app">
-          <div className="flex h-full">
-            {/* Main content panel */}
-            <div className="h-full flex w-full">
-              <div className="bg-background text-foreground border w-full overflow-hidden">
-                <Outlet />
-              </div>
+    <Fragment>
+      <main className="relative h-svh text-sm antialiased select-text bg-app">
+        <div className="flex h-full">
+          {/* Main content panel */}
+          <div className="h-full flex w-full">
+            <div className="bg-background text-foreground border w-full overflow-hidden">
+              <Outlet />
             </div>
           </div>
-        </main>
-      </Fragment>
-    </WindowFrame>
+        </div>
+      </main>
+    </Fragment>
   )
 }
 
@@ -201,8 +167,8 @@ function RootLayout() {
           <ToolApproval />
           <AgentApprovalDialog />
           <AgentFolderAccessDialog />
+          <VoiceSetupDialog />
           <AttachmentIngestionDialog />
-          <OutOfContextPromiseModal />
         </TranslationProvider>
       </ServiceHubProvider>
     </Fragment>

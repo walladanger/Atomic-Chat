@@ -1,7 +1,11 @@
 {
+  "api": "API",
+  "cloud": "Cloud",
   "assistants": "Asisten",
   "hardware": "Perangkat Keras",
   "mcp-servers": "Server MCP",
+  "connectors": "Konektor",
+  "plugins": "Plugin",
   "local_api_server": "Server API Lokal",
   "https_proxy": "Proksi HTTPS",
   "extensions": "Ekstensi",
@@ -28,6 +32,8 @@
   "unstar": "Batal Bintangi",
   "deleteAll": "Hapus Semua",
   "star": "Bintangi",
+  "openInNewWindow": "Buka di jendela baru",
+  "openInNewWindowFailed": "Tidak dapat membuka obrolan ini di jendela baru",
   "rename": "Ubah Nama",
   "delete": "Hapus",
   "copied": "Tersalin!",
@@ -379,5 +385,11 @@
     "searchProjects": "Cari proyek...",
     "noProjectsFound": "Tidak ada proyek ditemukan",
     "tryDifferentSearch": "Coba kata kunci pencarian lain"
+  },
+  "skills": "Keahlian",
+  "pluginsMenu": {
+    "title": "Plugin",
+    "emptySkills": "Belum ada keahlian",
+    "manageSkills": "Kelola keahlian"
   }
 }

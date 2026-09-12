@@ -33,6 +33,11 @@ type Model = {
   description?: string
   format?: string
   capabilities?: string[]
+  /**
+   * Reasoning knobs the model's chat template understands, detected from that
+   * template by the local backend extensions. Absent for remote providers.
+   */
+  reasoning?: import('@janhq/core').ReasoningControls
   settings?: Record<string, ProviderSetting>
   /** Whether this model is an embedding model (e.g., BERT-based) */
   embedding?: boolean
@@ -43,6 +48,10 @@ type Model = {
     | 'unsloth'
     | 'local'
     | 'huggingface-cache'
+    | 'gpt4all'
+    | 'jan'
+    | 'msty'
+    | 'llamacpp-cache'
   // Runtime-computed: weights file (or Ollama symlink target) is gone — a "broken link".
   missing?: boolean
   // Resolved absolute weights path; used to dedupe scan candidates vs imported models.

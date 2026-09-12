@@ -50,7 +50,11 @@ describe('ServiceHub integration', () => {
       providers: 'TauriProvidersService',
       dialog: 'TauriDialogService',
       opener: 'TauriOpenerService',
-      updater: 'TauriUpdaterService',
+      // Desktop included, deliberately: Radium never auto-updates, so there
+      // is no Tauri-backed updater to swap in and the no-op stays bound on
+      // every platform. See
+      // docs/decisions/2026-09-12-radium-never-auto-updates.md.
+      updater: 'DefaultUpdaterService',
       path: 'TauriPathService',
       core: 'TauriCoreService',
       deeplink: 'TauriDeepLinkService',

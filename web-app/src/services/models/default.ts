@@ -31,14 +31,15 @@ import type {
 } from './types'
 import { getCatalogOrFallback } from '@/services/model-catalog-registry'
 import { useDownloadStore } from '@/hooks/useDownloadStore'
-import posthog from 'posthog-js'
 import {
   isHfUrl,
   markDownloadStart,
+  normalizeModelId,
   quantFromModelId,
   sizeBucket,
   urlHost,
 } from '@/lib/telemetry'
+import { queuedCapture } from '@/lib/telemetry-queue'
 
 // Platform-active llama.cpp provider id. Windows registers only the
 // upstream extension ('llamacpp-upstream') after the 2026-05-22 ADR;
@@ -321,7 +322,11 @@ export class DefaultModelsService implements ModelsService {
         file.rfilename.toLowerCase().endsWith('.gguf')
       ) || []
 
-    // Separate regular GGUF files from mmproj and MTP companion files
+    // Keep only files that are runnable weights: drop the projectors, the MTP
+    // heads, and everything else a repo ships alongside its quants (imatrix
+    // dumps, DFlash/EAGLE drafts, vocab-only and audio-companion GGUFs) — none
+    // of those load as a model, and offering them is a download the user has to
+    // throw away.
     const regularGgufFiles = ggufFiles.filter(
       (file) =>
         !file.rfilename.toLowerCase().includes('mmproj') &&
@@ -509,14 +514,18 @@ export class DefaultModelsService implements ModelsService {
     // DownloadManagement listeners; this records the start (+ duration anchor).
     try {
       markDownloadStart(id)
-      posthog.capture('model_download', {
+      queuedCapture('model_download', {
         // NOT `status` — globally typed numeric in PostHog by
         // `api_server_request.status`, which silently nulls string values.
         // Must stay in sync with the terminal event in DownloadManagement.
         download_status: 'started',
         download_kind: 'model',
-        model_id: id,
+        model_id: normalizeModelId(id),
         quant: quantFromModelId(id),
+        // Usually `unknown` here: the byte count comes from HuggingFace
+        // metadata that is only fetched when `skipVerification` is false, and
+        // it defaults to true. The terminal event carries the real size from
+        // the downloader, so read `size_bucket` off that.
         size_bucket: sizeBucket(modelSize),
         is_hf_url: isHfUrl(modelPath),
         resolved_asset_url_host: urlHost(modelPath),
@@ -656,6 +665,20 @@ export class DefaultModelsService implements ModelsService {
     await Promise.all(
       activeByProvider.flatMap(({ provider, models }) =>
         models.map((model) => this.stopModel(model, provider))
+      )
+    )
+  }
+
+  async stopAllModelsExcept(
+    modelId: string,
+    providerName: string
+  ): Promise<void> {
+    const activeByProvider = await this.getLocalActiveModelsByProvider()
+    await Promise.all(
+      activeByProvider.flatMap(({ provider, models }) =>
+        models
+          .filter((model) => !(provider === providerName && model === modelId))
+          .map((model) => this.stopModel(model, provider))
       )
     )
   }

@@ -43,7 +43,6 @@ export const localStorageKey = {
   // dismissed. Survives a restart so the offer is not lost with the session.
   onboardingModelReminder: 'atomic-onboarding-model-reminder',
   agentMode: 'agent-mode',
-  agentModeAttentionSeen: 'agent-mode-attention-seen-v1',
   factoryResetPending: 'factory-reset-pending',
   lastSeenVersion: 'last-seen-version',
   threadNotifications: 'thread-notifications',
@@ -73,6 +72,43 @@ export const localStorageKey = {
   // secrets - a descriptor may name where its credential lives
   // (`auth.setting_key`) but never the credential itself.
   mediaProviders: 'media-providers',
+  // Epoch ms until which the GPU-backend recommendation dialog stays down after
+  // "Not now". It used to be session-only, so the dialog came back on every
+  // launch for anyone who had declined it.
+  backendRecommendationSnoozedUntil: 'backend-recommendation-snoozed-until',
+  // An onboarding run that is currently on screen: `{started_at, step,
+  // app_version}`. Written while SetupScreen is mounted and dropped by
+  // `captureOnboardingCompleted`, so a record still present at the next launch
+  // means the app was closed mid-flow — the only way to see that at all, since
+  // a window close gives the renderer no reliable chance to report it.
+  onboardingInFlight: 'onboarding-in-flight',
+  // A `backend_step_resolved` that a relaunch is about to interrupt. Written
+  // just before "Restart now" kills the process and sent on the next launch —
+  // otherwise a successful restart reports nothing at all and the data shows
+  // only the failures.
+  backendStepRestartIntent: 'backend-step-restart-intent',
+  // Voice input preferences: setup completion, input device, language hint
+  // and live-vs-on-stop transcription. One persisted bag rather than a raw
+  // flag, so the composer can read it reactively without the storage-event
+  // dance `useSetupCompleted` needs for `setup-completed`.
+  settingVoice: 'setting-voice',
 }
+
+/**
+ * Extension-owned keys that must survive a factory reset.
+ *
+ * Not part of `localStorageKey` because the app neither writes nor reads them
+ * for its own purposes — the llama.cpp extensions own them, and this list only
+ * exists so a reset does not force every user to re-download their GPU build.
+ *
+ * ATO-468: each engine moved to its own prefixed key and now reads the shared
+ * `llama_cpp_backend_type` only to migrate off it, so preserving the shared key
+ * alone had stopped preserving anything.
+ */
+export const BACKEND_PRESERVE_KEYS = [
+  'llama_cpp_backend_type',
+  'atomic_llamacpp_upstream_backend_type',
+  'atomic_llamacpp_turboquant_backend_type',
+] as const
 
 export const CACHE_EXPIRY_MS = 1000 * 60 * 60 * 24
