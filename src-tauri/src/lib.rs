@@ -98,7 +98,7 @@ pub fn run() {
         app_builder = app_builder.plugin(tauri_plugin_atomic_audio::init());
     }
 
-    // Desktop: include updater commands
+    // Desktop: the full command surface.
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     let app_builder = app_builder.invoke_handler(tauri::generate_handler![
         // FS commands - Deperecate soon
@@ -243,9 +243,6 @@ pub fn run() {
         // Download
         core::downloads::commands::download_files,
         core::downloads::commands::cancel_download_task,
-        // Custom updater commands (desktop only)
-        core::updater::commands::check_for_app_updates,
-        core::updater::commands::is_update_available,
         // HTTP (bypasses tauri_plugin_http fetch interception)
         core::http::post_local_http,
         core::http::get_local_http,
@@ -269,7 +266,7 @@ pub fn run() {
         core::media::commands::media_secret_available,
     ]);
 
-    // Mobile: no updater commands
+    // Mobile: the same surface minus the desktop-only commands.
     #[cfg(any(target_os = "android", target_os = "ios"))]
     let app_builder = app_builder.invoke_handler(tauri::generate_handler![
         // FS commands - Deperecate soon
@@ -523,10 +520,6 @@ pub fn run() {
                     log::warn!("Failed to register AUMID for toast notifications: {e}");
                 }
             }
-
-            #[cfg(not(any(target_os = "ios", target_os = "android")))]
-            app.handle()
-                .plugin(tauri_plugin_updater::Builder::new().build())?;
 
             // Start migration
             let mut store_path = get_jan_data_folder_path(app.handle().clone());

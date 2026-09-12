@@ -100,6 +100,16 @@ class PlatformServiceHub implements ServiceHub {
   private dialogService: DialogService = new DefaultDialogService()
   private openerService: OpenerService = new DefaultOpenerService()
   private authService: AuthService = new DefaultAuthService()
+  /**
+   * Permanently the no-op implementation, on every platform.
+   *
+   * The desktop build used to swap in a Tauri-backed one here. Radium
+   * does not auto-update: the endpoint it checked belongs to upstream, so
+   * accepting an update replaced this fork with Atomic Chat. The Tauri
+   * updater plugin, its endpoint and the whole Rust updater module are gone;
+   * this seam stays only so callers keep compiling, and it never reaches the
+   * network. See `docs/decisions/2026-09-12-radium-never-auto-updates.md`.
+   */
   private updaterService: UpdaterService = new DefaultUpdaterService()
   private pathService: PathService = new DefaultPathService()
   private coreService: CoreService = new DefaultCoreService()
@@ -137,7 +147,6 @@ class PlatformServiceHub implements ServiceHub {
           dialogModule,
           openerModule,
           authModule,
-          updaterModule,
           pathModule,
           coreModule,
           deepLinkModule,
@@ -153,7 +162,6 @@ class PlatformServiceHub implements ServiceHub {
           import('./dialog/tauri'),
           import('./opener/tauri'),
           import('./auth/tauri'),
-          import('./updater/tauri'),
           import('./path/tauri'),
           import('./core/tauri'),
           import('./deeplink/tauri'),
@@ -170,7 +178,6 @@ class PlatformServiceHub implements ServiceHub {
         this.dialogService = new dialogModule.TauriDialogService()
         this.openerService = new openerModule.TauriOpenerService()
         this.authService = new authModule.TauriAuthService()
-        this.updaterService = new updaterModule.TauriUpdaterService()
         this.pathService = new pathModule.TauriPathService()
         this.coreService = new coreModule.TauriCoreService()
         this.deepLinkService = new deepLinkModule.TauriDeepLinkService()
