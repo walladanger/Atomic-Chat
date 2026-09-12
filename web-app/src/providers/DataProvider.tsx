@@ -20,7 +20,6 @@ import { useThreads } from '@/hooks/useThreads'
 import { ensureProjectsLoaded } from '@/hooks/useThreadManagement'
 import { useLocalApiServer } from '@/hooks/useLocalApiServer'
 import { useAppState } from '@/hooks/useAppState'
-import { useAppUpdater } from '@/hooks/useAppUpdater'
 import { shouldAttemptAutoStart, switchToModel } from '@/utils/switchModel'
 import { useModelLoad } from '@/hooks/useModelLoad'
 import { consumeSilentImport } from '@/utils/backgroundImports'
@@ -113,7 +112,6 @@ export function DataProvider() {
   const { setThreads } = useThreads()
   const navigate = useNavigate()
   const serviceHub = useServiceHub()
-  const { checkForUpdate } = useAppUpdater()
 
   const setServerStatus = useAppState((state) => state.setServerStatus)
 
@@ -300,20 +298,6 @@ export function DataProvider() {
   useEffect(() => {
     syncRemoteProviders()
   }, [providers])
-
-  useEffect(() => {
-    if (isDev()) {
-      return
-    }
-    checkForUpdate()
-    const intervalId = setInterval(() => {
-      console.log('Periodic update check triggered')
-      checkForUpdate()
-    }, Number(UPDATE_CHECK_INTERVAL_MS))
-    return () => {
-      clearInterval(intervalId)
-    }
-  }, [checkForUpdate])
 
   useEffect(() => {
     const handleModelImported = async (eventData?: Record<string, unknown>) => {

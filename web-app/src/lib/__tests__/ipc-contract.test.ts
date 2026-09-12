@@ -23,9 +23,7 @@ const EXPECTED_DESKTOP_ONLY = new Set([
   'chatgpt_logout',
   'chatgpt_models',
   'chatgpt_status',
-  'check_for_app_updates',
   'get_local_http',
-  'is_update_available',
   // Radium Media provider credentials, in the OS credential store. Desktop
   // only on purpose: mobile has no media providers, and shipping a credential
   // surface it does not need would widen the attack surface for nothing.
